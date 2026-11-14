@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -87,6 +88,89 @@ void test_default_background_flag() {
          "sgr 0 default bg");
 }
 
+bool same_rows(const std::vector<tuide::TerminalStyledRow>& a,
+               const std::vector<tuide::TerminalStyledRow>& b) {
+  if (a.size() != b.size()) {
+    return false;
+  }
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    if (a[i].size() != b[i].size()) {
+      return false;
+    }
+    for (std::size_t j = 0; j < a[i].size(); ++j) {
+      if (a[i][j].text != b[i][j].text || a[i][j].fg != b[i][j].fg ||
+          a[i][j].bg != b[i][j].bg || a[i][j].bg_default != b[i][j].bg_default) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+void feed(tuide::RawPtyScreen* screen, const std::string& s) { screen->feed(s.data(), s.size()); }
+
+// La UI no copia ya el historial entero en cada tecla: lo que sincroniza de
+// forma incremental tiene que acabar igual que la copia completa.
+void test_incremental_sync_matches_full_copy() {
+  tuide::RawPtyScreen screen(10, 40);
+  std::vector<tuide::TerminalStyledRow> mirror;
+  tuide::TerminalRowsSyncCursor cursor;
+  auto check = [&](const char* what) {
+    screen.sync_styled_rows(&mirror, &cursor);
+    expect(same_rows(mirror, screen.styled_rows()), what);
+  };
+  check("sync empty screen");
+  feed(&screen, "\033[32m$ \033[0m");
+  check("sync prompt");
+  for (char ch : std::string("echo hola")) {
+    feed(&screen, std::string(1, ch));
+    check("sync per keystroke");
+  }
+  feed(&screen, "\b\033[K");
+  check("sync backspace");
+  feed(&screen, "\r\nhola\r\n$ ");
+  check("sync after newline");
+
+  // Llenar más allá del tope del scrollback para forzar recortes por delante,
+  // sincronizando a ritmos distintos (cada línea y a ráfagas).
+  for (int i = 0; i < 10600; ++i) {
+    feed(&screen, "line " + std::to_string(i) + "\r\n");
+    if (i % 97 == 0) {
+      check("sync while trimming");
+    }
+  }
+  check("sync after trim burst");
+  expect(mirror.size() <= 10000 + 512 + 1, "scrollback stays bounded");
+  expect(mirror.front().front().text.rfind("line ", 0) == 0, "oldest kept line");
+
+  screen.resize(12, 20);
+  check("sync after resize");
+  feed(&screen, "abc\r\n");
+  check("sync after resize + output");
+
+  // Un espejo tocado por fuera (la UI lo vacía al reiniciar) se recompone.
+  mirror.clear();
+  check("sync after external clear");
+
+  screen.reset(10, 40);
+  check("sync after reset");
+  feed(&screen, "x\r\ny");
+  check("sync after reset + output");
+}
+
+// Un cursor de otra pantalla no debe hacer creer que el espejo ya está al día.
+void test_sync_cursor_is_per_screen() {
+  tuide::RawPtyScreen a(5, 20);
+  tuide::RawPtyScreen b(5, 20);
+  feed(&a, "uno\r\ndos\r\n");
+  feed(&b, "tres\r\ncuatro\r\n");
+  std::vector<tuide::TerminalStyledRow> mirror;
+  tuide::TerminalRowsSyncCursor cursor;
+  a.sync_styled_rows(&mirror, &cursor);
+  b.sync_styled_rows(&mirror, &cursor);
+  expect(same_rows(mirror, b.styled_rows()), "cursor from another screen forces full copy");
+}
+
 }  // namespace
 
 int main() {
@@ -95,6 +179,8 @@ int main() {
   test_truecolor();
   test_256_background();
   test_default_background_flag();
+  test_incremental_sync_matches_full_copy();
+  test_sync_cursor_is_per_screen();
   std::cout << "raw_pty_screen_test: ok\n";
   return 0;
 }

@@ -1,6 +1,7 @@
 #include "terminal/raw_pty_screen.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <vector>
 
@@ -87,6 +88,11 @@ std::string trim_trailing_spaces(std::string line) {
   return line;
 }
 
+std::uint64_t next_screen_epoch() {
+  static std::atomic<std::uint64_t> counter{0};
+  return counter.fetch_add(1, std::memory_order_relaxed) + 1;
+}
+
 }  // namespace
 
 RawPtyScreen::RawPtyScreen(int rows, int cols) {
@@ -108,6 +114,8 @@ void RawPtyScreen::reset(int rows, int cols) {
   current_cells_.assign(static_cast<std::size_t>(cols_), ScreenCell{});
   cursor_col_ = 0;
   reset_sgr();
+  epoch_ = next_screen_epoch();
+  dropped_lines_ = 0;
   cache_valid_ = false;
 }
 
@@ -131,6 +139,9 @@ void RawPtyScreen::resize(int rows, int cols) {
     }
   }
   trim_lines();
+  // Las líneas cerradas se acaban de truncar en sitio: las copias ya no valen.
+  epoch_ = next_screen_epoch();
+  dropped_lines_ = 0;
   cache_valid_ = false;
 }
 
@@ -371,11 +382,15 @@ void RawPtyScreen::clear_to_end_of_line() {
 }
 
 constexpr int kMaxScrollbackLines = 10000;
+// Con el historial lleno, recortar de una en una desplaza ~10k filas por cada
+// salto de línea. Se deja crecer un poco y se recorta en bloque.
+constexpr int kScrollbackTrimSlack = 512;
 
 void RawPtyScreen::trim_lines() {
-  if (static_cast<int>(lines_.size()) > kMaxScrollbackLines) {
-    lines_.erase(lines_.begin(),
-                 lines_.end() - static_cast<std::ptrdiff_t>(kMaxScrollbackLines));
+  if (static_cast<int>(lines_.size()) > kMaxScrollbackLines + kScrollbackTrimSlack) {
+    const std::size_t excess = lines_.size() - static_cast<std::size_t>(kMaxScrollbackLines);
+    lines_.erase(lines_.begin(), lines_.begin() + static_cast<std::ptrdiff_t>(excess));
+    dropped_lines_ += excess;
   }
 }
 
@@ -425,14 +440,6 @@ void RawPtyScreen::feed(const char* data, std::size_t len) {
   cache_valid_ = false;
 }
 
-std::vector<TerminalStyledRow> RawPtyScreen::build_all_rows() const {
-  std::vector<TerminalStyledRow> all;
-  all.reserve(lines_.size() + 1);
-  all.insert(all.end(), lines_.begin(), lines_.end());
-  all.push_back(spans_from_cells(current_cells_, cursor_col_));
-  return all;
-}
-
 std::vector<TerminalStyledRow> RawPtyScreen::build_visible_rows() const {
   std::vector<TerminalStyledRow> visible;
   visible.reserve(static_cast<std::size_t>(rows_));
@@ -456,8 +463,6 @@ std::vector<TerminalStyledRow> RawPtyScreen::build_visible_rows() const {
 }
 
 void RawPtyScreen::rebuild_cache() const {
-  cached_styled_rows_ = build_all_rows();
-
   const std::vector<TerminalStyledRow> visible = build_visible_rows();
   std::string result;
   result.reserve(static_cast<std::size_t>(rows_) * static_cast<std::size_t>(cols_ + 1));
@@ -492,10 +497,39 @@ std::string RawPtyScreen::text() const {
 }
 
 std::vector<TerminalStyledRow> RawPtyScreen::styled_rows() const {
-  if (!cache_valid_) {
-    rebuild_cache();
+  std::vector<TerminalStyledRow> all;
+  all.reserve(lines_.size() + 1);
+  all.insert(all.end(), lines_.begin(), lines_.end());
+  all.push_back(spans_from_cells(current_cells_, cursor_col_));
+  return all;
+}
+
+void RawPtyScreen::sync_styled_rows(std::vector<TerminalStyledRow>* dst,
+                                    TerminalRowsSyncCursor* cursor) const {
+  if (dst == nullptr || cursor == nullptr) {
+    return;
   }
-  return cached_styled_rows_;
+  // dst cubre las líneas absolutas [cursor->dropped, cursor->dropped + committed)
+  // más la activa; lines_ cubre [dropped_lines_, dropped_lines_ + size).
+  const bool same_history = cursor->epoch == epoch_ && dropped_lines_ >= cursor->dropped &&
+                            dst->size() == cursor->committed + 1;
+  const std::uint64_t newly_dropped = same_history ? dropped_lines_ - cursor->dropped : 0;
+  if (!same_history || newly_dropped > cursor->committed) {
+    dst->assign(lines_.begin(), lines_.end());
+  } else {
+    dst->pop_back();
+    dst->erase(dst->begin(), dst->begin() + static_cast<std::ptrdiff_t>(newly_dropped));
+    const std::size_t kept = dst->size();
+    if (kept > lines_.size()) {
+      dst->assign(lines_.begin(), lines_.end());
+    } else {
+      dst->insert(dst->end(), lines_.begin() + static_cast<std::ptrdiff_t>(kept), lines_.end());
+    }
+  }
+  dst->push_back(spans_from_cells(current_cells_, cursor_col_));
+  cursor->epoch = epoch_;
+  cursor->dropped = dropped_lines_;
+  cursor->committed = lines_.size();
 }
 
 }  // namespace tuide

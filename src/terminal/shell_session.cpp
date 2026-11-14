@@ -182,7 +182,6 @@ void ShellSession::request_start(const ShellLaunchConfig& config, int cols, int 
   {
     std::lock_guard<std::mutex> lock(terminal_mutex_);
     display_text_.clear();
-    display_styled_rows_.clear();
   }
 
   std::thread([this, config] {
@@ -386,7 +385,6 @@ void ShellSession::stop() {
   {
     std::lock_guard<std::mutex> lock(terminal_mutex_);
     display_text_.clear();
-    display_styled_rows_.clear();
   }
 }
 
@@ -401,7 +399,13 @@ std::string ShellSession::display_text() {
 
 std::vector<TerminalStyledRow> ShellSession::display_styled_rows() {
   std::lock_guard<std::mutex> lock(terminal_mutex_);
-  return display_styled_rows_;
+  return terminal_.styled_rows();
+}
+
+void ShellSession::sync_display_styled_rows(std::vector<TerminalStyledRow>* dst,
+                                    TerminalRowsSyncCursor* cursor) {
+  std::lock_guard<std::mutex> lock(terminal_mutex_);
+  terminal_.sync_styled_rows(dst, cursor);
 }
 
 int ShellSession::cursor_col() {
@@ -477,11 +481,11 @@ bool ShellSession::feed_pty_bytes_locked(const char* data, std::size_t len) {
   const std::string prev_text = display_text_;
   const int prev_col = terminal_.cursor_col();
   const int prev_row = terminal_.cursor_row();
-  const std::size_t prev_rows = display_styled_rows_.size();
+  const int prev_rows = terminal_.total_rows();
   terminal_.feed(data, len);
   rebuild_display_locked();
   return display_text_ != prev_text || terminal_.cursor_col() != prev_col ||
-         terminal_.cursor_row() != prev_row || display_styled_rows_.size() != prev_rows;
+         terminal_.cursor_row() != prev_row || terminal_.total_rows() != prev_rows;
 }
 
 void ShellSession::on_pty_bytes(const char* data, std::size_t len) {
@@ -594,8 +598,9 @@ void ShellSession::background_drain() {
 }
 
 void ShellSession::rebuild_display_locked() {
+  // Solo el texto visible: copiar aquí todo el scrollback en cada lectura del
+  // PTY era lo que hacía notar el eco de cada tecla con mucho historial.
   display_text_ = terminal_.text();
-  display_styled_rows_ = terminal_.styled_rows();
 }
 
 void ShellSession::rebuild_display() {

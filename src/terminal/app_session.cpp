@@ -59,7 +59,6 @@ void AppSession::reset_display() {
   std::lock_guard<std::mutex> lock(terminal_mutex_);
   terminal_.reset(rows_, cols_);
   display_text_.clear();
-  display_styled_rows_.clear();
 }
 
 void AppSession::ensure_emulator(int cols, int rows) {
@@ -72,7 +71,6 @@ void AppSession::ensure_emulator(int cols, int rows) {
     std::lock_guard<std::mutex> lock(terminal_mutex_);
     terminal_.reset(rows_, cols_);
     display_text_.clear();
-    display_styled_rows_.clear();
   }
   emulator_only_.store(true, std::memory_order_release);
   running_.store(true, std::memory_order_release);
@@ -126,7 +124,6 @@ std::string AppSession::open_host_pty(int cols, int rows) {
     std::lock_guard<std::mutex> lock(terminal_mutex_);
     terminal_.reset(rows_, cols_);
     display_text_.clear();
-    display_styled_rows_.clear();
   }
 
   int master = -1;
@@ -178,7 +175,6 @@ int AppSession::start_command(const std::string& cwd, const std::vector<std::str
     std::lock_guard<std::mutex> lock(terminal_mutex_);
     terminal_.reset(rows_, cols_);
     display_text_.clear();
-    display_styled_rows_.clear();
   }
 
   int master = -1;
@@ -315,7 +311,13 @@ std::string AppSession::display_text() {
 
 std::vector<TerminalStyledRow> AppSession::display_styled_rows() {
   std::lock_guard<std::mutex> lock(terminal_mutex_);
-  return display_styled_rows_;
+  return terminal_.styled_rows();
+}
+
+void AppSession::sync_display_styled_rows(std::vector<TerminalStyledRow>* dst,
+                                    TerminalRowsSyncCursor* cursor) {
+  std::lock_guard<std::mutex> lock(terminal_mutex_);
+  terminal_.sync_styled_rows(dst, cursor);
 }
 
 int AppSession::cursor_col() {
@@ -382,11 +384,11 @@ bool AppSession::feed_pty_bytes_locked(const char* data, std::size_t len) {
   const std::string prev_text = display_text_;
   const int prev_col = terminal_.cursor_col();
   const int prev_row = terminal_.cursor_row();
-  const std::size_t prev_rows = display_styled_rows_.size();
+  const int prev_rows = terminal_.total_rows();
   terminal_.feed(data, len);
   rebuild_display_locked();
   return display_text_ != prev_text || terminal_.cursor_col() != prev_col ||
-         terminal_.cursor_row() != prev_row || display_styled_rows_.size() != prev_rows;
+         terminal_.cursor_row() != prev_row || terminal_.total_rows() != prev_rows;
 }
 
 void AppSession::on_pty_bytes(const char* data, std::size_t len) {
@@ -502,8 +504,9 @@ void AppSession::background_drain() {
 }
 
 void AppSession::rebuild_display_locked() {
+  // Solo el texto visible: copiar aquí todo el scrollback en cada lectura del
+  // PTY era lo que hacía notar el eco de cada tecla con mucho historial.
   display_text_ = terminal_.text();
-  display_styled_rows_ = terminal_.styled_rows();
 }
 
 void AppSession::rebuild_display() {

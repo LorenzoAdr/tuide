@@ -104,6 +104,7 @@ struct PtyViewState {
 
   std::string terminal_text;
   std::vector<TerminalStyledRow> terminal_styled_rows;
+  TerminalRowsSyncCursor terminal_rows_cursor;
   struct TerminalLinkHover {
     int row = -1;
     int span_start = 0;
@@ -2810,7 +2811,7 @@ void refresh_terminal_view(ShellSession* shell, ConsolePanelState* state, PtyVie
     return;
   }
   view->terminal_text = text;
-  view->terminal_styled_rows = shell->display_styled_rows();
+  shell->sync_display_styled_rows(&view->terminal_styled_rows, &view->terminal_rows_cursor);
   sync_pty_filter(state, view);
   const int new_total = terminal_display_total(view);
   if (view->terminal_follow_tail) {
@@ -3003,7 +3004,7 @@ Element render_app_terminal(ConsolePanelState* state, AppSession* app, FocusMana
     const std::string text_buf = app->display_text();
     if (!text_buf.empty() && (text_buf != view->terminal_text || !view->terminal_view_valid)) {
       view->terminal_text = text_buf;
-      view->terminal_styled_rows = app->display_styled_rows();
+      app->sync_display_styled_rows(&view->terminal_styled_rows, &view->terminal_rows_cursor);
       sync_pty_filter(state, view);
       const int new_total = terminal_display_total(view);
       if (view->terminal_follow_tail) {

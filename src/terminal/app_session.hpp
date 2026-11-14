@@ -52,6 +52,9 @@ class AppSession {
   bool consume_output_pending();
   std::string display_text();
   std::vector<TerminalStyledRow> display_styled_rows();
+  // Lo que usa la UI en cada refresco: copia solo lo nuevo del scrollback.
+  void sync_display_styled_rows(std::vector<TerminalStyledRow>* dst,
+                                TerminalRowsSyncCursor* cursor);
   int cursor_col();
   int cursor_row();
 
@@ -91,7 +94,6 @@ class AppSession {
   std::unique_ptr<std::thread> reader_thread_;
   ThreadSafeQueue<std::string> output_chunks_;
   std::string display_text_;
-  std::vector<TerminalStyledRow> display_styled_rows_;
   std::atomic<bool> output_pending_{false};
   std::atomic<bool> consumer_active_{true};
   std::mutex notify_mutex_;

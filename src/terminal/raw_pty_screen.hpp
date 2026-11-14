@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,16 @@ struct TerminalStyledSpan {
 
 using TerminalStyledRow = std::vector<TerminalStyledSpan>;
 
+// Qué parte del scrollback tiene ya una copia sincronizada con
+// RawPtyScreen::sync_styled_rows. Las líneas cerradas no cambian nunca (solo se
+// recortan por delante), así que basta con saber cuántas se copiaron y cuántas
+// se habían descartado: el resto del historial no se vuelve a copiar.
+struct TerminalRowsSyncCursor {
+  std::uint64_t epoch = 0;
+  std::uint64_t dropped = 0;
+  std::size_t committed = 0;
+};
+
 // Lightweight PTY screen buffer. Handles text layout, basic cursor control and
 // ANSI SGR colours used by shell prompts (16 / 256 / truecolor).
 class RawPtyScreen {
@@ -35,7 +46,13 @@ class RawPtyScreen {
   int cursor_row() const { return static_cast<int>(lines_.size()); }
   int total_rows() const { return static_cast<int>(lines_.size()) + 1; }
   std::string text() const;
+  // Copia completa (historial + línea activa). Cara con mucho scrollback: la UI
+  // debe usar sync_styled_rows.
   std::vector<TerminalStyledRow> styled_rows() const;
+  // Deja *dst igual que styled_rows() copiando solo lo nuevo desde la última
+  // sincronización con el mismo cursor: en una tecla, la línea activa.
+  void sync_styled_rows(std::vector<TerminalStyledRow>* dst,
+                        TerminalRowsSyncCursor* cursor) const;
 
  private:
   struct ScreenCell {
@@ -60,7 +77,6 @@ class RawPtyScreen {
   // preserve_cols: do not trim trailing spaces before this column (active cursor).
   TerminalStyledRow spans_from_cells(const std::vector<ScreenCell>& cells,
                                      int preserve_cols = 0) const;
-  std::vector<TerminalStyledRow> build_all_rows() const;
   std::vector<TerminalStyledRow> build_visible_rows() const;
   void rebuild_cache() const;
 
@@ -73,8 +89,12 @@ class RawPtyScreen {
   bool bg_default_ = true;
   std::vector<TerminalStyledRow> lines_;
   std::vector<ScreenCell> current_cells_;
+  // Cambia cuando el historial se reescribe (reset/resize) y las copias ya no
+  // valen. Único entre instancias para que un cursor no case con otra pantalla.
+  std::uint64_t epoch_ = 0;
+  // Líneas descartadas por delante desde el último cambio de epoch_.
+  std::uint64_t dropped_lines_ = 0;
   mutable std::string cached_text_;
-  mutable std::vector<TerminalStyledRow> cached_styled_rows_;
   mutable bool cache_valid_ = false;
 };
 
