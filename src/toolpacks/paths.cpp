@@ -106,7 +106,7 @@ std::string default_catalog_url() {
       !override_url.empty()) {
     return override_url;
   }
-  return "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/catalog.json";
+  return "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/catalog.json";
 }
 
 bool toolpacks_root_is_writable() {

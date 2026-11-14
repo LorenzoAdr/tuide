@@ -8,7 +8,7 @@ DIST_DIR="${ROOT}/dist"
 VERSION="${VERSION:-}"
 SKIP_BUILD=0
 PUBLISH=0
-REPO="${REPO:-LorenzoAdr/TIDE}"
+REPO="${REPO:-LorenzoAdr/tuide}"
 
 log() {
   printf '[build-release-appimage] %s\n' "$*"
@@ -30,7 +30,7 @@ Opciones:
   --version VER     Versión del asset (sin prefijo v). Default: tag git o $VERSION
   --skip-build      Reusar dist/tuide-x86_64-glibc2.27-static-libstdc++ existente
   --publish         Crear/actualizar release GitHub con gh (tag v${VERSION})
-  --repo OWNER/REPO Default: LorenzoAdr/TIDE
+  --repo OWNER/REPO Default: LorenzoAdr/tuide
   -h, --help        Esta ayuda
 
 Variables:

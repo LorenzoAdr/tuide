@@ -10,7 +10,7 @@
       "version": "19.1.2",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/clangd-19.1.2-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/clangd-19.1.2-linux-x86_64.tar.zst",
       "sha256": "eae0e3533a1ac53a224df04b062424f293bcc2ec2f211c89919f22d575c279a9",
       "size_bytes": 34156545,
       "license": "Apache-2.0 WITH LLVM-exception",
@@ -24,7 +24,7 @@
       "version": "19.1.2",
       "arch": ["aarch64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/clangd-19.1.2-linux-aarch64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/clangd-19.1.2-linux-aarch64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "Apache-2.0 WITH LLVM-exception",
@@ -38,7 +38,7 @@
       "version": "16.3-static",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/gdb-16.3-static-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/gdb-16.3-static-linux-x86_64.tar.zst",
       "sha256": "bbf1dc5ad60756163856a63583572d80c8ad0a6b6925339c3303f2d62f395ea2",
       "size_bytes": 16497222,
       "license": "GPL-3.0-or-later",
@@ -53,7 +53,7 @@
       "version": "3.12.13+1.39.9+1.8.21-full",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/python-tools-3.12.13+1.39.9+1.8.21-full-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/python-tools-3.12.13+1.39.9+1.8.21-full-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -66,7 +66,7 @@
       "version": "5.6.0",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/bash-ls-5.6.0-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/bash-ls-5.6.0-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -79,7 +79,7 @@
       "version": "0.3.9",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/bash-dap-0.3.9-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/bash-dap-0.3.9-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -92,7 +92,7 @@
       "version": "5.26.0",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/texlab-5.26.0-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/texlab-5.26.0-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "GPL-3.0-or-later"
@@ -105,7 +105,7 @@
       "version": "2025-12-29",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/rust-analyzer-2025-12-29-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/rust-analyzer-2025-12-29-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "Apache-2.0 WITH LLVM-exception"
@@ -118,7 +118,7 @@
       "version": "v0.23.0",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/gopls-v0.23.0-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/gopls-v0.23.0-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "BSD-3-Clause"
@@ -131,7 +131,7 @@
       "version": "0.16.0",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/zls-0.16.0-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/zls-0.16.0-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -144,7 +144,7 @@
       "version": "3.2.2",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/fortls-3.2.2-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/fortls-3.2.2-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -157,7 +157,7 @@
       "version": "3.18.2",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/lua-ls-3.18.2-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/lua-ls-3.18.2-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -170,7 +170,7 @@
       "version": "5.3.0+ts7.0.2",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/typescript-ls-5.3.0+ts7.0.2-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/typescript-ls-5.3.0+ts7.0.2-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -183,7 +183,7 @@
       "version": "v0.10.4",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/neocmakelsp-v0.10.4-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/neocmakelsp-v0.10.4-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -196,7 +196,7 @@
       "version": "v0.1.16",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/make-ls-v0.1.16-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/make-ls-v0.1.16-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -209,7 +209,7 @@
       "version": "1.24.0",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/yaml-ls-1.24.0-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/yaml-ls-1.24.0-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "MIT"
@@ -222,7 +222,7 @@
       "version": "0.29.3",
       "arch": ["x86_64"],
       "os": ["linux"],
-      "url": "https://github.com/LorenzoAdr/TIDE/releases/download/catalog-latest/lemminx-0.29.3-linux-x86_64.tar.zst",
+      "url": "https://github.com/LorenzoAdr/tuide/releases/download/catalog-latest/lemminx-0.29.3-linux-x86_64.tar.zst",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size_bytes": 0,
       "license": "EPL-2.0"
