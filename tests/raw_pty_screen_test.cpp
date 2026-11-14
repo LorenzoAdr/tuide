@@ -158,6 +158,51 @@ void test_incremental_sync_matches_full_copy() {
   check("sync after reset + output");
 }
 
+std::string active_line(const tuide::RawPtyScreen& screen) {
+  std::string line;
+  const auto rows = screen.styled_rows();
+  for (const auto& span : rows.back()) {
+    line += span.text;
+  }
+  return line;
+}
+
+// Secuencias reales de bash/readline (TERM=xterm-256color) al editar con el
+// cursor fuera del final de la línea.
+void test_readline_mid_line_editing() {
+  {
+    tuide::RawPtyScreen screen(3, 40);
+    // "axyz", dos veces <-, backspace: bash manda \b ESC[1P y recoloca el cursor.
+    feed(&screen, "$ axyz\b\b\b\033[1Pyz\b\b");
+    expect(active_line(screen) == "$ ayz", "DCH removes the deleted char from the tail");
+    expect(screen.cursor_col() == 3, "DCH keeps cursor at edit point");
+  }
+  {
+    tuide::RawPtyScreen screen(3, 40);
+    feed(&screen, "$ abcdef\b\b\b\b\033[3P");
+    expect(active_line(screen) == "$ abf", "DCH with count");
+  }
+  {
+    tuide::RawPtyScreen screen(3, 10);
+    feed(&screen, "abcdefgh\r\033[2C\033[2@");
+    expect(active_line(screen) == "ab  cdefgh", "ICH inserts blanks and keeps the tail");
+    feed(&screen, "\033[3@");
+    expect(active_line(screen) == "ab     cde", "ICH drops what falls off the right edge");
+  }
+  {
+    tuide::RawPtyScreen screen(3, 20);
+    feed(&screen, "abcdef\r\033[1C\033[2X");
+    expect(active_line(screen) == "a  def", "ECH blanks without shifting");
+    feed(&screen, "\033[3C\033[1K");
+    expect(active_line(screen).find_first_not_of(' ') == 5, "EL 1 clears up to the cursor");
+  }
+  {
+    tuide::RawPtyScreen screen(3, 20);
+    feed(&screen, "$ abc\b\033[K");
+    expect(active_line(screen) == "$ ab", "backspace at end of line");
+  }
+}
+
 // Un cursor de otra pantalla no debe hacer creer que el espejo ya está al día.
 void test_sync_cursor_is_per_screen() {
   tuide::RawPtyScreen a(5, 20);
@@ -181,6 +226,7 @@ int main() {
   test_default_background_flag();
   test_incremental_sync_matches_full_copy();
   test_sync_cursor_is_per_screen();
+  test_readline_mid_line_editing();
   std::cout << "raw_pty_screen_test: ok\n";
   return 0;
 }

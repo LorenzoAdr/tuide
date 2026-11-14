@@ -219,9 +219,26 @@ void RawPtyScreen::handle_csi(char cmd, const std::string& params) {
   if (cmd == 'K') {
     if (params.empty() || params == "0") {
       clear_to_end_of_line();
+    } else if (params == "1") {
+      clear_to_start_of_line();
     } else if (params == "2") {
       clear_current_line();
     }
+    return;
+  }
+  // readline edita en mitad de la línea con estas tres: sin ellas, al borrar con
+  // el cursor movido bash corre la cola a la izquierda con DCH y el último
+  // carácter se quedaba pintado aunque ya no exista en la línea.
+  if (cmd == 'P') {
+    delete_chars(std::max(1, parse_first_param(params, 1)));
+    return;
+  }
+  if (cmd == '@') {
+    insert_blanks(std::max(1, parse_first_param(params, 1)));
+    return;
+  }
+  if (cmd == 'X') {
+    erase_chars(std::max(1, parse_first_param(params, 1)));
     return;
   }
   if (cmd == 'G' || cmd == 'f') {
@@ -370,6 +387,50 @@ void RawPtyScreen::backspace() {
 void RawPtyScreen::clear_current_line() {
   current_cells_.assign(static_cast<std::size_t>(cols_), ScreenCell{});
   cursor_col_ = 0;
+  cache_valid_ = false;
+}
+
+void RawPtyScreen::clear_to_start_of_line() {
+  ensure_current_width();
+  const int end = std::min(cursor_col_, cols_ - 1);
+  for (int col = 0; col <= end; ++col) {
+    current_cells_[static_cast<std::size_t>(col)] = ScreenCell{};
+  }
+  cache_valid_ = false;
+}
+
+void RawPtyScreen::delete_chars(int count) {
+  ensure_current_width();
+  if (cursor_col_ >= cols_) {
+    return;
+  }
+  const auto first = current_cells_.begin() + cursor_col_;
+  const auto last = current_cells_.begin() + cols_;
+  const int n = std::min(count, cols_ - cursor_col_);
+  std::move(first + n, last, first);
+  std::fill(last - n, last, ScreenCell{});
+  cache_valid_ = false;
+}
+
+void RawPtyScreen::insert_blanks(int count) {
+  ensure_current_width();
+  if (cursor_col_ >= cols_) {
+    return;
+  }
+  const auto first = current_cells_.begin() + cursor_col_;
+  const auto last = current_cells_.begin() + cols_;
+  const int n = std::min(count, cols_ - cursor_col_);
+  std::move_backward(first, last - n, last);
+  std::fill(first, first + n, ScreenCell{});
+  cache_valid_ = false;
+}
+
+void RawPtyScreen::erase_chars(int count) {
+  ensure_current_width();
+  const int end = std::min(cols_, cursor_col_ + count);
+  for (int col = cursor_col_; col < end; ++col) {
+    current_cells_[static_cast<std::size_t>(col)] = ScreenCell{};
+  }
   cache_valid_ = false;
 }
 

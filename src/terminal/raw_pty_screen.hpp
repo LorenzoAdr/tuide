@@ -68,6 +68,10 @@ class RawPtyScreen {
   void backspace();
   void clear_current_line();
   void clear_to_end_of_line();
+  void clear_to_start_of_line();
+  void delete_chars(int count);
+  void insert_blanks(int count);
+  void erase_chars(int count);
   void trim_lines();
   void apply_sgr(const std::string& params);
   void handle_csi(char cmd, const std::string& params);
