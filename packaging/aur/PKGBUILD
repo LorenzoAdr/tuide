@@ -1,0 +1,49 @@
+# Maintainer: Lorenzo Arias del Real <lorenzo.adr at proton dot me>
+pkgname=tuide-bin
+_pkgname=tuide
+pkgver=0.1.5
+pkgrel=1
+pkgdesc='A full IDE in your terminal: LSP for 13 languages, DAP debugger, embedded shell and native-binary forensics'
+arch=('x86_64')
+url='https://lorenzoadr.github.io/tuide/'
+license=('Apache-2.0')
+depends=('glibc' 'zlib')
+makedepends=('squashfs-tools')
+optdepends=(
+  'gdb: debug native programs'
+  'clang: clangd for C and C++ code intelligence'
+  'git: version control panel'
+  'curl: download language toolpacks from the catalog'
+  'zstd: extract language toolpacks'
+)
+provides=("${_pkgname}")
+conflicts=("${_pkgname}")
+options=('!strip' '!debug')
+source=("${_pkgname}-${pkgver}.AppImage::https://github.com/LorenzoAdr/tuide/releases/download/v${pkgver}/tuide-${pkgver}.AppImage"
+        "LICENSE-${pkgver}::https://raw.githubusercontent.com/LorenzoAdr/tuide/v${pkgver}/LICENSE")
+noextract=("${_pkgname}-${pkgver}.AppImage")
+sha256sums=('cc1c287e757d43940f6c933712159c073d80792c9916d39e9ea7ffefbcd7b505'
+            'SKIP')
+
+# The AppImage is an ELF runtime followed by a squashfs image. Extract the image
+# directly (no FUSE, nothing executed): it starts where the ELF section headers end.
+prepare() {
+  local img="${_pkgname}-${pkgver}.AppImage" shoff shentsize shnum
+  shoff=$(od -An -t u8 -j 40 -N 8 "$img" | tr -d ' ')
+  shentsize=$(od -An -t u2 -j 58 -N 2 "$img" | tr -d ' ')
+  shnum=$(od -An -t u2 -j 60 -N 2 "$img" | tr -d ' ')
+  rm -rf squashfs-root
+  unsquashfs -q -n -o $((shoff + shentsize * shnum)) -d squashfs-root "$img"
+}
+
+package() {
+  install -d "${pkgdir}/opt/${_pkgname}"
+  cp -a squashfs-root/. "${pkgdir}/opt/${_pkgname}/"
+  chmod -R u+rwX,go+rX,go-w "${pkgdir}/opt/${_pkgname}"
+  install -d "${pkgdir}/usr/bin"
+  ln -s "/opt/${_pkgname}/AppRun" "${pkgdir}/usr/bin/${_pkgname}"
+  install -Dm644 squashfs-root/tuide.png "${pkgdir}/usr/share/pixmaps/${_pkgname}.png"
+  install -Dm644 squashfs-root/tuide.desktop "${pkgdir}/usr/share/applications/${_pkgname}.desktop"
+  sed -i -E 's|^Exec=.*|Exec=tuide %F|' "${pkgdir}/usr/share/applications/${_pkgname}.desktop"
+  install -Dm644 "LICENSE-${pkgver}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

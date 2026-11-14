@@ -1,0 +1,26 @@
+pkgbase = tuide-bin
+	pkgdesc = A full IDE in your terminal: LSP for 13 languages, DAP debugger, embedded shell and native-binary forensics
+	pkgver = 0.1.5
+	pkgrel = 1
+	url = https://lorenzoadr.github.io/tuide/
+	arch = x86_64
+	license = Apache-2.0
+	makedepends = squashfs-tools
+	depends = glibc
+	depends = zlib
+	optdepends = gdb: debug native programs
+	optdepends = clang: clangd for C and C++ code intelligence
+	optdepends = git: version control panel
+	optdepends = curl: download language toolpacks from the catalog
+	optdepends = zstd: extract language toolpacks
+	provides = tuide
+	conflicts = tuide
+	noextract = tuide-0.1.5.AppImage
+	options = !strip
+	options = !debug
+	source = tuide-0.1.5.AppImage::https://github.com/LorenzoAdr/tuide/releases/download/v0.1.5/tuide-0.1.5.AppImage
+	source = LICENSE-0.1.5::https://raw.githubusercontent.com/LorenzoAdr/tuide/v0.1.5/LICENSE
+	sha256sums = cc1c287e757d43940f6c933712159c073d80792c9916d39e9ea7ffefbcd7b505
+	sha256sums = SKIP
+
+pkgname = tuide-bin
