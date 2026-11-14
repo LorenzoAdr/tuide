@@ -2265,6 +2265,34 @@ bool terminal_body_contains(const ConsolePanelState* state, const PtyViewState* 
   return y >= body_top && y <= state->panel_box.y_max;
 }
 
+// Geometry passed into update_terminal_layout / render_shell_terminal. The session
+// tab bar takes one row of the console body. Tick and paint must use the same
+// numbers: a one-row disagreement clears terminal_resize_applied every frame,
+// SIGWINCH hits bash, and the prompt redraw burns CPU for as long as the panel
+// stays open.
+void shell_pty_geometry(int body_height, int panel_width, bool split, int* rows, int* cols,
+                        int* partner_cols) {
+  if (rows != nullptr) {
+    *rows = std::max(1, body_height - 1);
+  }
+  if (!split) {
+    if (cols != nullptr) {
+      *cols = panel_width;
+    }
+    if (partner_cols != nullptr) {
+      *partner_cols = 0;
+    }
+    return;
+  }
+  const int half = std::max(20, panel_width / 2);
+  if (cols != nullptr) {
+    *cols = half;
+  }
+  if (partner_cols != nullptr) {
+    *partner_cols = std::max(20, panel_width - half - 1);
+  }
+}
+
 void update_terminal_layout(PtyViewState* view, int panel_height, int panel_width,
                             MainLayoutState* /*layout_state*/) {
   if (view == nullptr || panel_height <= 0) {
@@ -3849,23 +3877,25 @@ Element build_console_panel_view(
     PtyViewState* active_view = active_terminal_view(state, shell_sessions);
     ShellSession* active_shell =
         shell_sessions != nullptr ? shell_sessions->active_session() : nullptr;
+    int pty_rows = 0;
+    int active_cols = 0;
+    int partner_cols = 0;
+    shell_pty_geometry(body_height, panel_width, split, &pty_rows, &active_cols, &partner_cols);
     Element content;
     if (split) {
       const int partner_index = (active_index + 1) % session_count;
       PtyViewState* partner_view =
           state->terminal_sessions[static_cast<std::size_t>(partner_index)].get();
       ShellSession* partner_shell = shell_sessions->session_at(partner_index);
-      const int half_width = std::max(20, panel_width / 2);
       Element left = render_shell_terminal(state, active_view, model, active_shell, focus,
-                                           layout_state, std::max(1, body_height - 1), half_width);
+                                           layout_state, pty_rows, active_cols);
       Element right = render_shell_terminal(state, partner_view, model, partner_shell, focus,
-                                            layout_state, std::max(1, body_height - 1),
-                                            std::max(20, panel_width - half_width - 1));
-      content = hbox({std::move(left) | size(WIDTH, EQUAL, half_width), separator(),
+                                            layout_state, pty_rows, partner_cols);
+      content = hbox({std::move(left) | size(WIDTH, EQUAL, active_cols), separator(),
                       std::move(right) | flex});
     } else {
       content = render_shell_terminal(state, active_view, model, active_shell, focus, layout_state,
-                                      std::max(1, body_height - 1), panel_width);
+                                      pty_rows, panel_width);
     }
     body = vbox({std::move(session_bar), std::move(content) | flex}) | flex;
   } else if (selected_tab == ConsolePanelTabs::kApp) {
@@ -4471,20 +4501,33 @@ Component MakeConsolePanel(AppMode* app_mode, DebugModel* model,
           shell->clear_failed();
         }
       }
-      const int panel_height =
-          bottom_height != nullptr && *bottom_height > 1 ? *bottom_height : 8;
-      int layout_height = 0;
+      int body_height = 0;
       int panel_width = 0;
-      console_body_metrics(layout_state, state.get(), bottom_height, &panel_width, &layout_height);
-      if (layout_state == nullptr || !layout_state->console_expanded) {
-        layout_height = std::max(2, panel_height - 2);
-        panel_width = state->panel_box.x_max >= state->panel_box.x_min
-                          ? state->panel_box.x_max - state->panel_box.x_min + 1
-                          : 80;
-      }
+      console_body_metrics(layout_state, state.get(), bottom_height, &panel_width, &body_height);
       const bool on_app = app_tab_active(app_mode, layout_state);
       PtyViewState* view = on_app ? &state->app_view_state : terminal_view;
-      update_terminal_layout(view, layout_height, panel_width, layout_state);
+      const int session_count_for_layout =
+          shell_sessions != nullptr ? shell_sessions->count() : 0;
+      const bool split_layout =
+          !on_app && layout_state->terminal_split_enabled && session_count_for_layout >= 2;
+      if (on_app) {
+        update_terminal_layout(view, body_height, panel_width, layout_state);
+      } else {
+        int pty_rows = 0;
+        int active_cols = 0;
+        int partner_cols = 0;
+        shell_pty_geometry(body_height, panel_width, split_layout, &pty_rows, &active_cols,
+                           &partner_cols);
+        update_terminal_layout(terminal_view, pty_rows, split_layout ? active_cols : panel_width,
+                               layout_state);
+        if (split_layout) {
+          const int partner_index =
+              (shell_sessions->active_index() + 1) % session_count_for_layout;
+          PtyViewState* partner_view =
+              state->terminal_sessions[static_cast<std::size_t>(partner_index)].get();
+          update_terminal_layout(partner_view, pty_rows, partner_cols, layout_state);
+        }
+      }
       if (on_app && app_session != nullptr) {
         if (app_session->running() || app_session->has_live_pty()) {
           app_session->resize(view->pending_terminal_cols, view->pending_terminal_rows);
