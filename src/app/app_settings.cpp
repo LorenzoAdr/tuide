@@ -194,6 +194,14 @@ AppSettings AppSettings::load() {
     if (doc.contains("perf_dump_enabled") && doc["perf_dump_enabled"].is_boolean()) {
       settings.perf_dump_enabled = doc["perf_dump_enabled"].get<bool>();
     }
+    if (doc.contains("hang_watchdog_enabled") && doc["hang_watchdog_enabled"].is_boolean()) {
+      settings.hang_watchdog_enabled = doc["hang_watchdog_enabled"].get<bool>();
+    }
+    if (doc.contains("hang_watchdog_threshold_ms") &&
+        doc["hang_watchdog_threshold_ms"].is_number_integer()) {
+      settings.hang_watchdog_threshold_ms =
+          std::max(500, doc["hang_watchdog_threshold_ms"].get<int>());
+    }
     if (doc.contains("development_options_enabled") &&
         doc["development_options_enabled"].is_boolean()) {
       settings.development_options_enabled = doc["development_options_enabled"].get<bool>();
@@ -276,6 +284,8 @@ bool AppSettings::save() const {
   doc["force_bundled_gdb"] = force_bundled_gdb;
   doc["monitor_enabled"] = monitor_enabled;
   doc["perf_dump_enabled"] = perf_dump_enabled;
+  doc["hang_watchdog_enabled"] = hang_watchdog_enabled;
+  doc["hang_watchdog_threshold_ms"] = hang_watchdog_threshold_ms;
   doc["development_options_enabled"] = development_options_enabled;
   doc["passive_mode_enabled"] = passive_mode_enabled;
   doc["grace_window_ms"] = grace_window_ms;

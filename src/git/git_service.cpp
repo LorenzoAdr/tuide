@@ -328,16 +328,21 @@ void GitService::discover_repos(const std::string& workspace_root,
   if (!main_valid && subrepos.empty()) {
     info.valid = false;
     info.last_error = i18n::tr("git.not_repo");
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (workspace_root_ != workspace_root) {
-      return;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (workspace_root_ != workspace_root) {
+        return;
+      }
+      main_repo_valid_ = false;
+      main_repo_root_.clear();
+      subrepos_.clear();
+      context_repo_root_.clear();
+      repo_branch_by_root_.clear();
+      repo_info_ = info;
     }
-    main_repo_valid_ = false;
-    main_repo_root_.clear();
-    subrepos_.clear();
-    context_repo_root_.clear();
-    repo_branch_by_root_.clear();
-    repo_info_ = info;
+    // Fuera del lock: wake_ui() vuelve a tomar mutex_ (no recursivo). Con el aviso
+    // dentro, el worker se bloqueaba a sí mismo y la UI quedaba colgada en el
+    // siguiente acceso a GitService al abrir cualquier carpeta sin repositorio.
     notify_updated();
     return;
   }

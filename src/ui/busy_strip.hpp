@@ -55,7 +55,10 @@ struct BusyStripState {
   int percent = 0;
   std::string label;
   int label_width = kDefaultLabelWidth;
+  // `box` lo rellena reflect() durante el render, sin lock. El hilo del spinner pinta
+  // con `paint_box`, la copia que el hilo de UI deja bajo paint_mutex tras cada Draw.
   ftxui::Box box;
+  ftxui::Box paint_box;
   bool box_valid = false;
   int spinner_frame = 0;
   int64_t last_spinner_ms = 0;

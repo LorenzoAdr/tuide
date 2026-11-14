@@ -36,6 +36,9 @@ struct AppSettings {
   bool force_bundled_gdb = false;
   bool monitor_enabled = false;
   bool perf_dump_enabled = false;
+  // Vigía de cuelgues: barato, pensado para ir siempre activo (ver hang_watchdog.hpp).
+  bool hang_watchdog_enabled = true;
+  int hang_watchdog_threshold_ms = 3000;
   bool development_options_enabled = false;
   bool passive_mode_enabled = true;
   int grace_window_ms = 1000;

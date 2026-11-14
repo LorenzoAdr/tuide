@@ -23,7 +23,10 @@ class BuildEnvironmentService {
                                                       const WorkspaceConfig& config,
                                                       const EnvironmentSelectionHints& hints = {});
 
-  const BuildEnvironment& active_environment() const;
+  // Copia, no referencia: el hilo de generación reasigna active_environment_ cuando
+  // cambian los artefactos de build, y una referencia leída fuera del lock podía
+  // ver los std::string a medio reasignar.
+  BuildEnvironment active_environment() const;
   std::string active_environment_fingerprint() const;
 
   void schedule_background_generation(const std::string& workspace_root,

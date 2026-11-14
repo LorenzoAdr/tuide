@@ -289,7 +289,28 @@ Run under GDB:
 gdb --args ./build/tuide --cwd . ./build/hello
 ```
 
-Crash backtraces are printed via `util/crash_handler.cpp` (`-rdynamic` enabled on Unix).
+Crash backtraces are printed via `util/crash_handler.cpp` (`-rdynamic` enabled on Unix),
+and also written to `~/.config/tuide/hangs/crash-<pid>.txt`; the terminal is restored first.
+
+### Hangs (always-on watchdog)
+
+`util/hang_watchdog.cpp` posts an empty task to the FTXUI loop every second. If it is not
+run within `hang_watchdog_threshold_ms` (default 3000), it writes
+`~/.config/tuide/hangs/hang-<date>-<pid>.txt`: UI phase, last key action, every thread's
+state/`wchan`, and a backtrace per thread (UI thread first). A second dump follows at 15 s if
+still stuck; `RESUMED after Xs` is appended if the UI recovers. Nothing is written while the
+UI is healthy, so it stays on (`hang_watchdog_enabled` in `settings.json`).
+
+From another terminal (the main thread is named `ui-main`, so `pkill tuide` does not match):
+
+```bash
+pkill -USR1 ui-main   # dump now, keep running
+pkill -USR2 ui-main   # dump, restore the terminal and exit (exit code 3)
+addr2line -Cfpe build/tuide 0x<offset>   # resolve the (+0x...) frames
+```
+
+The older `monitor_enabled` trace mode logs everything up front and is costly (fsync per
+key action, log rewrites every 200 ms); use it only for targeted sessions.
 
 For UI issues, the status bar shows the active focus region (`[Editor]`, `[Terminal]`, …).
 

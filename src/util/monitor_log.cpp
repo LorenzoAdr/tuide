@@ -858,11 +858,14 @@ void test_rewind_inflight(std::chrono::milliseconds age) {
   g_flight_dirty = true;
 }
 
-MonitorScope::MonitorScope(std::string_view category, std::string_view name)
-    : category_(category), name_(name), start_(std::chrono::steady_clock::now()) {
+MonitorScope::MonitorScope(std::string_view category, std::string_view name) {
+  // Apagado no copia nada: hay scopes en caminos calientes (LSP, git, ticks).
   if (!enabled()) {
     return;
   }
+  category_ = std::string(category);
+  name_ = std::string(name);
+  start_ = std::chrono::steady_clock::now();
   id_ = register_scope(category_, name_, &hot_);
   if (id_ == 0) {
     return;

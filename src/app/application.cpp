@@ -92,6 +92,7 @@
 #include "util/compile_commands_remap.hpp"
 #include "util/compile_commands_setup.hpp"
 #include "util/lsp_missing_prompt.hpp"
+#include "util/hang_watchdog.hpp"
 #include "util/monitor_log.hpp"
 #include "util/nm_reader.hpp"
 #include "util/path_normalize.hpp"
@@ -200,13 +201,32 @@ Component WrapUiTickPost(Component child, MainLayoutState *layout, ScreenInterac
 		UiInputSyncWrapper(MainLayoutState *layout_state, Application *application)
 		    : layout_state_(layout_state), application_(application) {}
 
+		Element OnRender() override {
+			TUIDE_HANG_PHASE("render");
+			if (application_ != nullptr) {
+				if (!loop_started_) {
+					loop_started_ = true;
+					application_->on_loop_started();
+				}
+				application_->publish_active_doc_snapshot();
+			}
+			return ComponentBase::OnRender();
+		}
+
 		bool OnEvent(Event event) override {
+			TUIDE_HANG_PHASE("event.dispatch");
 			const bool is_custom = (event == Event::Custom);
 			const bool significant = is_significant_input_event(event);
 			const bool handled = ComponentBase::OnEvent(std::move(event));
 			if (!is_custom && significant && application_ != nullptr) {
+				TUIDE_HANG_PHASE("event.input_sync_drain");
 				application_->run_input_sync_drain(steady_now_ms());
-			} 
+			}
+			if (application_ != nullptr) {
+				// Abrir/cambiar de pestaña ocurre aquí: que tree-sitter lo vea sin esperar
+				// al render.
+				application_->publish_active_doc_snapshot();
+			}
 			// FTXUI solo invalida frame_valid_ cuando OnEvent devuelve false. Si un hijo
 			// devuelve true en Custom (p. ej. consola), Draw() se salta aunque el apply
 			// LSP ya corrió en screen->Post — el 3.er repintado nunca llega al terminal.
@@ -219,6 +239,7 @@ Component WrapUiTickPost(Component child, MainLayoutState *layout, ScreenInterac
 	  private:
 		MainLayoutState *layout_state_;
 		Application *application_;
+		bool loop_started_ = false;
 	};
 	auto sync = Make<UiInputSyncWrapper>(layout, app);
 	sync->Add(std::move(guard));
@@ -228,6 +249,9 @@ Component WrapUiTickPost(Component child, MainLayoutState *layout, ScreenInterac
 } // namespace
 
 Application::Application(AppConfig config) : config_(std::move(config)) {
+	// Antes de arrancar ningún hilo: con ui_events nulo, ui_wake ejecutaba pre_paint
+	// en el hilo que lo llamara. Sin pantalla todavía, los eventos se acumulan.
+	layout_state_.ui_events = &ui_event_dispatcher_;
 	std::error_code ec;
 
 	if (config_.workspace_root.empty()) {
@@ -364,11 +388,18 @@ Application::Application(AppConfig config) : config_(std::move(config)) {
 		ui_event_dispatcher_.emit_urgent(std::move(event));
 	});
 	symbol_provider_->set_lsp_status_callback([this](const std::string& i18n_key) {
-		set_workspace_status(i18n::tr(i18n_key));
-		if (is_lsp_missing_status_key(i18n_key)) {
-			enqueue_ui_task([this, i18n_key]() { maybe_show_lsp_missing_toast(i18n_key); });
-			UI_WAKE(&layout_state_, "app");
-		}
+		// Llega desde los hilos de arranque de LSP (lsp-start, lsp-py-start, …), con
+		// el mutex del proveedor tomado. Escribir status_message aquí competía con el
+		// hilo de UI (guardar, abrir, navegar también lo escriben): dos hilos sobre el
+		// mismo std::string corrompen el heap. Justo al abrir el primer archivo de un
+		// lenguaje, que es cuando arranca su servidor.
+		enqueue_ui_task([this, i18n_key]() {
+			set_workspace_status(i18n::tr(i18n_key));
+			if (is_lsp_missing_status_key(i18n_key)) {
+				maybe_show_lsp_missing_toast(i18n_key);
+			}
+		});
+		UI_WAKE(&layout_state_, "app");
 	});
 	app_settings_ = AppSettings::load();
 	load_key_bindings_file(&keybind_registry());
@@ -826,22 +857,31 @@ void Application::setup_build_environment_watching() {
 		watch_dirs.push_back(active.working_dir);
 	}
 
-	global_build_environment_service().set_environment_changed_callback(
-	    [this] { schedule_debounced_lsp_restart(); });
+	// Ambos callbacks llegan desde hilos de fondo (generación de entorno, build-watch)
+	// y tocaban estado de la UI: workspace_, workspace_config_, model_.program,
+	// binary_symbols_pending y el temporizador de reinicio de LSP. Se pasa todo al
+	// hilo de UI; notify_artifacts_changed no bloquea (lanza su propio hilo).
+	global_build_environment_service().set_environment_changed_callback([this] {
+		enqueue_ui_task([this] { schedule_debounced_lsp_restart(); });
+		UI_WAKE(&layout_state_, "build.environment");
+	});
 
 	build_artifact_watcher_.set_change_callback([this] {
-		if (workspace_.root.empty()) {
-			return;
-		}
-		EnvironmentSelectionHints hints;
-		hints.active_file_path =
-		    workspace_.buffer.path.empty() ? workspace_.active_file : workspace_.buffer.path;
-		global_build_environment_service().notify_artifacts_changed(workspace_.root,
-		                                                            workspace_config_, hints);
-		schedule_debounced_lsp_restart();
-		if (!model_.program.empty()) {
-			refresh_binary_symbols_if_matches(&layout_state_, model_.program);
-		}
+		enqueue_ui_task([this] {
+			if (workspace_.root.empty()) {
+				return;
+			}
+			EnvironmentSelectionHints hints;
+			hints.active_file_path =
+			    workspace_.buffer.path.empty() ? workspace_.active_file : workspace_.buffer.path;
+			global_build_environment_service().notify_artifacts_changed(workspace_.root,
+			                                                            workspace_config_, hints);
+			schedule_debounced_lsp_restart();
+			if (!model_.program.empty()) {
+				refresh_binary_symbols_if_matches(&layout_state_, model_.program);
+			}
+		});
+		UI_WAKE(&layout_state_, "build.artifacts");
 	});
 	build_artifact_watcher_.start(workspace_.root, watch_dirs);
 }
@@ -1079,6 +1119,7 @@ void Application::enqueue_ui_task(std::function<void()> task) {
 }
 
 void Application::drain_ui_tasks() {
+	TUIDE_HANG_PHASE("drain_ui_tasks");
 	std::deque<std::function<void()>> tasks;
 	{
 		std::lock_guard<std::mutex> lock(ui_task_mutex_);
@@ -1141,6 +1182,7 @@ void Application::run_custom_event_drain(int64_t now_ms, const UiEventDrainPlan 
 	if (plan.run_debug) {
 		UiSyncPhaseScope phase(&layout_state_.ui_perf_monitor, "drain_events");
 		TUIDE_MON_SCOPE("ui", "tick.drain_events");
+		TUIDE_HANG_PHASE("tick.drain_events");
 		drain_events();
 	}
 
@@ -1148,6 +1190,7 @@ void Application::run_custom_event_drain(int64_t now_ms, const UiEventDrainPlan 
 		if (!any_modal_open()) {
 			UiSyncPhaseScope phase(&layout_state_.ui_perf_monitor, "apply_pending_connection");
 			TUIDE_MON_SCOPE("ui", "tick.apply_pending_connection");
+			TUIDE_HANG_PHASE("tick.apply_pending_connection");
 			apply_pending_connection();
 		}
 		// Las ráfagas de inotify las aplica idx-apply. Este tick solo recibe el wake
@@ -1155,6 +1198,7 @@ void Application::run_custom_event_drain(int64_t now_ms, const UiEventDrainPlan 
 		if (layout_state_.activity_gate.allows_deferred_panel_tick()) {
 			UiSyncPhaseScope phase(&layout_state_.ui_perf_monitor, "process_build_environment");
 			TUIDE_MON_SCOPE("ui", "tick.process_build_environment_updates");
+			TUIDE_HANG_PHASE("tick.process_build_environment_updates");
 			process_build_environment_updates();
 		}
 		if (layout_state_.source_tick_callback && app_mode_ == AppMode::kDebug) {
@@ -1164,6 +1208,7 @@ void Application::run_custom_event_drain(int64_t now_ms, const UiEventDrainPlan 
 	{
 		UiSyncPhaseScope phase(&layout_state_.ui_perf_monitor, "git");
 		TUIDE_MON_SCOPE("ui", "tick.git");
+		TUIDE_HANG_PHASE("tick.git");
 		git_service_.drain_ui();
 		if (plan.run_full_background && layout_state_.activity_gate.allows_deferred_panel_tick()) {
 			git_service_.tick();
@@ -1193,6 +1238,7 @@ void Application::run_custom_event_drain(int64_t now_ms, const UiEventDrainPlan 
       layout_state_.console_visible && layout_state_.terminal_tick_callback) {
 		UiSyncPhaseScope phase(&layout_state_.ui_perf_monitor, "terminal");
 		TUIDE_MON_SCOPE("ui", "tick.terminal");
+		TUIDE_HANG_PHASE("tick.terminal");
 		layout_state_.terminal_tick_callback();
 	}
 
@@ -1200,21 +1246,25 @@ void Application::run_custom_event_drain(int64_t now_ms, const UiEventDrainPlan 
 		if (layout_state_.outline_tick_callback && !layout_state_.welcome_visible) {
 			UiSyncPhaseScope phase(&layout_state_.ui_perf_monitor, "outline");
 			TUIDE_MON_SCOPE("ui", "tick.outline");
+			TUIDE_HANG_PHASE("tick.outline");
 			layout_state_.outline_tick_callback();
 		}
 		if (layout_state_.primary_editor.tick_callback && !layout_state_.welcome_visible) {
 			UiSyncPhaseScope phase(&layout_state_.ui_perf_monitor, "primary_editor");
 			TUIDE_MON_SCOPE("ui", "tick.primary_editor");
+			TUIDE_HANG_PHASE("tick.primary_editor");
 			layout_state_.primary_editor.tick_callback();
 		}
 		if (layout_state_.secondary_editor.tick_callback && !layout_state_.welcome_visible) {
 			UiSyncPhaseScope phase(&layout_state_.ui_perf_monitor, "secondary_editor");
 			TUIDE_MON_SCOPE("ui", "tick.secondary_editor");
+			TUIDE_HANG_PHASE("tick.secondary_editor");
 			layout_state_.secondary_editor.tick_callback();
 		}
 		if (symbol_provider_ && layout_state_.activity_gate.allows_lsp_ui()) {
 			UiSyncPhaseScope phase(&layout_state_.ui_perf_monitor, "drain_async_results");
 			TUIDE_MON_SCOPE("ui", "tick.drain_async_results");
+			TUIDE_HANG_PHASE("tick.drain_async_results");
 			if (symbol_provider_->drain_async_results() &&
 			    symbol_provider_->async_drain_invalidates_view()) {
 				workspace_.buffer.view_token++;
@@ -1637,6 +1687,7 @@ void Application::process_pending_workspace_load() {
 	if (!pending_workspace_load_.has_value()) {
 		return;
 	}
+	TUIDE_HANG_PHASE("workspace.load");
 	const std::string chosen = std::move(*pending_workspace_load_);
 	pending_workspace_load_.reset();
 	const WorkspaceDetectResult detected = resolve_workspace_for_anchor(chosen);
@@ -2836,6 +2887,36 @@ bool Application::handle_focus_shortcuts(const Event &event) {
 	return false;
 }
 
+void Application::publish_active_doc_snapshot() {
+	active_doc_last_edit_ms_.store(workspace_.last_buffer_edit_ms, std::memory_order_release);
+	std::lock_guard<std::mutex> lock(active_doc_snapshot_mutex_);
+	// Comparar antes de copiar: casi siempre no ha cambiado y así no hay asignaciones.
+	if (active_doc_buffer_path_ != workspace_.buffer.path) {
+		active_doc_buffer_path_ = workspace_.buffer.path;
+	}
+	if (active_doc_active_file_ != workspace_.active_file) {
+		active_doc_active_file_ = workspace_.active_file;
+	}
+}
+
+void Application::on_loop_started() {
+	// FTXUI acaba de cambiar SIGSEGV & co. por un manejador que retorna (ver
+	// crash_handler.hpp): sin esto, un fallo en el hilo de UI la cuelga para siempre.
+	reinstall_fault_handlers();
+	hang_watchdog::mark_loop_running();
+	if (active_screen_ != nullptr) {
+		ui_event_dispatcher_.set_screen(active_screen_);
+	}
+	// Antes este arranque se enviaba con Post() antes de Loop, y FTXUI lo descartaba.
+	if (active_screen_ != nullptr) {
+		active_screen_->Post([this] {
+			if (layout_state_.terminal_start_requested && layout_state_.console_visible) {
+				request_terminal_autostart();
+			}
+		});
+	}
+}
+
 int Application::run() {
 	set_current_thread_name("ui-main");
 	if (config_.auto_debug && connection_config_complete() && !config_.show_welcome_screen &&
@@ -2844,8 +2925,23 @@ int Application::run() {
 	}
 
 	const bool ui_smoke = std::getenv("TUIDE_UI_SMOKE") != nullptr;
+	hang_watchdog::set_phase("startup");
+	hang_watchdog::save_terminal_state();
 	auto screen = ui_smoke ? ScreenInteractive::TerminalOutput() : ScreenInteractive::Fullscreen();
 	active_screen_ = &screen;
+	// Arranca ya, antes de Loop: un cuelgue de arranque también deja informe (la sonda
+	// queda en cola hasta que el bucle la atienda). Se para antes de destruir screen.
+	struct HangWatchdogGuard {
+		~HangWatchdogGuard() { hang_watchdog::stop(); }
+	} hang_watchdog_guard;
+	if (app_settings_.hang_watchdog_enabled && !ui_smoke) {
+		hang_watchdog::Options watchdog_options;
+		watchdog_options.threshold =
+		    std::chrono::milliseconds(app_settings_.hang_watchdog_threshold_ms);
+		hang_watchdog::start(watchdog_options, [&screen](std::function<void()> task) {
+			screen.Post(std::move(task));
+		});
+	}
 	screen.TrackMouse(false);
 	if (!ui_smoke) {
 		screen.ForceHandleCtrlC(false);
@@ -3332,6 +3428,7 @@ int Application::run() {
 	    [this] { on_ai_missing_install(); }, [this] { on_ai_missing_ignore(); });
 
 	auto inner_root = CatchEvent(with_ai_missing_toast, [this, &screen, on_command](const Event &event) {
+		TUIDE_HANG_PHASE(event == Event::Custom ? "event.custom_tick" : "event.input");
 		try {
 			const bool editor_browse_active = app_mode_ == AppMode::kNormal ||
 			                                  model_.is_post_mortem || app_mode_ == AppMode::kDebug;
@@ -3404,18 +3501,25 @@ int Application::run() {
 			return false;
 		}
 
-			if (!event.is_character() && !event.is_mouse()) {
+			// Con el monitor apagado no se construye ningún string por tecla.
+			if (monitor_log::enabled() && !event.is_character() && !event.is_mouse()) {
 				std::ostringstream key_msg;
 				key_msg << "key event=" << event.input()
 				        << " focus=" << focus_state_.region_label();
 				TUIDE_MON("ui", key_msg.str());
 			}
-			if (monitor_log::enabled() && !event.is_mouse() &&
-			    !event_is_kitty_key_release(event)) {
-				if (const std::optional<KeyAction> action =
-				        keybind_match(event, KeyScope::Any)) {
-					monitor_log::note_user_action(key_action_id(*action), event.input(),
-					                              focus_state_.region_label());
+			if (!event.is_mouse() && !event_is_kitty_key_release(event)) {
+				if (event.is_character()) {
+					hang_watchdog::note_key_action(-1, "typing");
+				} else if (const std::optional<KeyAction> action =
+				               keybind_match(event, KeyScope::Any)) {
+					// kActionMeta guarda literales: el puntero sigue vivo para el vigía.
+					hang_watchdog::note_key_action(static_cast<int>(*action),
+					                               key_action_id(*action).data());
+					if (monitor_log::enabled()) {
+						monitor_log::note_user_action(key_action_id(*action), event.input(),
+						                              focus_state_.region_label());
+					}
 				}
 			}
 
@@ -4138,16 +4242,10 @@ int Application::run() {
 auto root = MakeShutdownOverlay(inner_root, &shutdown_state_, &shutdown_overlay_state_,
 	                                &layout_state_, [this] { force_exit(); });
 
-	layout_state_.ui_events = &ui_event_dispatcher_;
-	ui_event_dispatcher_.set_screen(&screen);
+	// El dispatcher ya está enganchado desde el constructor; la pantalla se le da en
+	// on_loop_started(), cuando Post() deja de descartar.
 	// Do NOT UI_WAKE before Loop: PostEvent can set custom_pending_ and never drain,
-	// blocking all later wakes. Schedule the kick on the first loop iteration.
-	screen.Post([this] {
-		if (layout_state_.terminal_start_requested && layout_state_.console_visible) {
-			request_terminal_autostart();
-		}
-	});
-
+	// blocking all later wakes. The kick runs from on_loop_started() (first render).
 	register_backend_wake_callback();
 	tree_sitter_service().set_ready_callback([this](const std::string& path) {
 		if (path.empty()) {
@@ -4163,22 +4261,26 @@ auto root = MakeShutdownOverlay(inner_root, &shutdown_state_, &shutdown_overlay_
 			}
 			tree_sitter_last_wake_revision_[path] = revision;
 		}
+		// Corre en el hilo de parseo: workspace_ es del hilo de UI y abrir un archivo
+		// reasigna buffer.path justo cuando termina el parse de ese mismo archivo.
+		bool is_buffer = false;
+		bool is_active_file = false;
+		{
+			std::lock_guard<std::mutex> lock(active_doc_snapshot_mutex_);
+			is_buffer = active_doc_buffer_path_ == path;
+			is_active_file = active_doc_active_file_ == path;
+		}
 		const int64_t now = steady_now_ms();
 		const bool typing_burst =
-		    now - workspace_.last_buffer_edit_ms < 250 &&
-		    workspace_.buffer.path == path;
+		    now - active_doc_last_edit_ms_.load(std::memory_order_acquire) < 250 && is_buffer;
 		enqueue_ui_task([this, path]() {
 			layout_state_.panel_render_cache.mark_dirty(UiPanelId::RightSidebar);
 			if (layout_state_.outline_tick_callback) {
 				layout_state_.outline_tick_callback();
 			}
 		});
-		if (!typing_burst) {
-			const bool active =
-			    path == workspace_.buffer.path || path == workspace_.active_file;
-			if (active) {
-				invalidate(&layout_state_, UiInvalidation::TreeSitterActiveFile);
-			}
+		if (!typing_burst && (is_buffer || is_active_file)) {
+			invalidate(&layout_state_, UiInvalidation::TreeSitterActiveFile);
 		}
 	});
 	visual_highlight_service().set_debounce_wake_callback([this]() {
@@ -4193,6 +4295,7 @@ auto root = MakeShutdownOverlay(inner_root, &shutdown_state_, &shutdown_overlay_
 	                                                 &layout_state_.ui_custom_tick,
 	                                                 &layout_state_.ui_perf_monitor);
 
+	hang_watchdog::set_phase(nullptr);
 	screen.Loop(WrapUiTickPost(root, &layout_state_, &screen,
 	                           [this] { return any_modal_open(); }, this));
 

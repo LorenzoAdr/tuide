@@ -58,7 +58,7 @@ void BuildEnvironmentService::set_environment_changed_callback(
   on_environment_changed_ = std::move(callback);
 }
 
-const BuildEnvironment& BuildEnvironmentService::active_environment() const {
+BuildEnvironment BuildEnvironmentService::active_environment() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return active_environment_;
 }

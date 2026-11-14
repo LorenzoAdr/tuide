@@ -8,28 +8,51 @@ namespace tuide {
 
 using namespace ftxui;
 
-void UiEventDispatcher::set_screen(ScreenInteractive* screen) { screen_ = screen; }
-
-uint64_t UiEventDispatcher::begin_input_correlation() {
-  active_correlation_id_ = next_correlation_id_++;
-  return active_correlation_id_;
+void UiEventDispatcher::set_screen(ScreenInteractive* screen) {
+  // ui_thread_ antes del store con release: quien vea screen_ ve también el hilo.
+  ui_thread_ = std::this_thread::get_id();
+  std::vector<std::function<void()>> deferred;
+  {
+    std::lock_guard<std::mutex> lock(pending_mutex_);
+    screen_.store(screen, std::memory_order_release);
+    deferred.swap(pending_main_);
+  }
+  if (screen == nullptr) {
+    return;
+  }
+  for (auto& fn : deferred) {
+    screen->Post(std::move(fn));
+  }
+  // Eventos encolados antes de tener pantalla: un Custom para drenarlos ya.
+  custom_pending_.store(true, std::memory_order_release);
+  screen->PostEvent(Event::Custom);
 }
 
-uint64_t UiEventDispatcher::current_correlation_id() const { return active_correlation_id_; }
+uint64_t UiEventDispatcher::begin_input_correlation() {
+  const uint64_t id = next_correlation_id_++;
+  active_correlation_id_.store(id, std::memory_order_release);
+  return id;
+}
+
+uint64_t UiEventDispatcher::current_correlation_id() const {
+  return active_correlation_id_.load(std::memory_order_acquire);
+}
 
 bool UiEventDispatcher::correlation_still_valid(uint64_t id) const {
-  return id != 0 && id == active_correlation_id_;
+  return id != 0 && id == active_correlation_id_.load(std::memory_order_acquire);
 }
 
 void UiEventDispatcher::post_custom_coalesced(bool urgent) {
-  if (screen_ == nullptr) {
+  (void)urgent;
+  ScreenInteractive* const screen = screen_.load(std::memory_order_acquire);
+  if (screen == nullptr) {
+    // Se queda en pending_events_; set_screen lanza el Custom que los drena.
     return;
   }
-  (void)urgent;
   if (custom_pending_.exchange(true, std::memory_order_acq_rel)) {
     return;
   }
-  screen_->PostEvent(Event::Custom);
+  screen->PostEvent(Event::Custom);
 }
 
 void UiEventDispatcher::enqueue(UiEvent event, bool urgent) {
@@ -50,7 +73,7 @@ void UiEventDispatcher::emit(UiEvent event) { enqueue(std::move(event), false); 
 void UiEventDispatcher::emit_urgent(UiEvent event) { enqueue(std::move(event), true); }
 
 void UiEventDispatcher::post_repaint_urgent() {
-  if (screen_ == nullptr) {
+  if (screen_.load(std::memory_order_acquire) == nullptr) {
     return;
   }
   UiEvent event;
@@ -111,27 +134,41 @@ void UiEventDispatcher::emit_debug(std::string tag, std::function<void()> pre_pa
 }
 
 void UiEventDispatcher::post_repaint_custom() {
-  if (screen_ == nullptr) {
+  ScreenInteractive* const screen = screen_.load(std::memory_order_acquire);
+  if (screen == nullptr) {
     return;
   }
-  screen_->PostEvent(Event::Custom);
+  screen->PostEvent(Event::Custom);
 }
 
 void UiEventDispatcher::post_on_main(std::function<void()> fn) {
   if (!fn) {
     return;
   }
-  if (screen_ == nullptr) {
-    fn();
-    return;
+  {
+    std::lock_guard<std::mutex> lock(pending_mutex_);
+    if (screen_.load(std::memory_order_acquire) == nullptr) {
+      // Antes se ejecutaba aquí mismo, en el hilo que llamase: guardarlo para el
+      // hilo de UI.
+      pending_main_.push_back(std::move(fn));
+      return;
+    }
   }
-  screen_->Post(std::move(fn));
+  screen_.load(std::memory_order_acquire)->Post(std::move(fn));
 }
 
 void UiEventDispatcher::request_animation_frame() {
-  if (screen_ != nullptr) {
-    screen_->RequestAnimationFrame();
+  ScreenInteractive* const screen = screen_.load(std::memory_order_acquire);
+  if (screen == nullptr) {
+    return;
   }
+  if (std::this_thread::get_id() == ui_thread_) {
+    screen->RequestAnimationFrame();
+    return;
+  }
+  // Desde el lector del PTY u otro hilo: RequestAnimationFrame escribe estado del
+  // bucle sin lock; Post sí es seguro y lo ejecuta en el hilo de UI.
+  screen->Post([screen] { screen->RequestAnimationFrame(); });
 }
 
 UiEventDrainPlan UiEventDispatcher::drain_pending(int64_t now_ms) {

@@ -85,6 +85,11 @@ class Application {
   explicit Application(AppConfig config);
   ~Application();
   int run();
+  // Primer render: el bucle de FTXUI ya atiende Post() y tiene sus manejadores puestos.
+  void on_loop_started();
+  // Copia de la ruta activa y la última edición para hilos de fondo (tree-sitter).
+  // Solo la escribe el hilo de UI, tras cada evento y antes de cada render.
+  void publish_active_doc_snapshot();
   void run_input_sync_drain(int64_t now_ms);
 
  private:
@@ -259,6 +264,10 @@ class Application {
   bool ai_indexes_requested_ = false;
   UiActivityPhase last_activity_phase_ = UiActivityPhase::kInhibited;
   UiEventDispatcher ui_event_dispatcher_;
+  std::mutex active_doc_snapshot_mutex_;
+  std::string active_doc_buffer_path_;
+  std::string active_doc_active_file_;
+  std::atomic<int64_t> active_doc_last_edit_ms_{0};
   mutable std::mutex tree_sitter_wake_mutex_;
   std::map<std::string, uint64_t> tree_sitter_last_wake_revision_;
   // Active editor tab paths (normalized); read from the inotify thread via predicate.

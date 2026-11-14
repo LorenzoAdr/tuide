@@ -102,13 +102,15 @@ void paint_ansi_unlocked(BusyStripState* state) {
   if (state == nullptr || state->halted.load(std::memory_order_acquire)) {
     return;
   }
-  // reflect() rellena box durante el Render a Screen; vale tras el primer Draw.
-  if (state->box.x_max < state->box.x_min || state->box.y_max < state->box.y_min) {
+  // paint_box se copia de box tras cada Draw (busy_strip_reassert_after_draw); hasta
+  // el primero está vacía y no se pinta.
+  const ftxui::Box& box = state->paint_box;
+  if (box.x_max < box.x_min || box.y_max < box.y_min) {
     return;
   }
   state->box_valid = true;
-  const int row = state->box.y_min + 1;
-  const int col = state->box.x_min + 1;
+  const int row = box.y_min + 1;
+  const int col = box.x_min + 1;
   const std::string line = format_strip_line(*state);
   // Mismo color que el texto de foco a la izquierda (Header), no Muted de botones.
   const std::string fg = theme::Header().Print(/*is_background_color=*/false);
@@ -513,6 +515,8 @@ void busy_strip_reassert_after_draw(BusyStripState* state) {
     return;
   }
   std::lock_guard<std::mutex> lock(state->paint_mutex);
+  // Hilo de UI, ya fuera del render: box es estable aquí.
+  state->paint_box = state->box;
   paint_ansi_unlocked(state);
 }
 

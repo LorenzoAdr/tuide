@@ -1,5 +1,6 @@
 #include "util/crash_handler.hpp"
 
+#include <atomic>
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
@@ -7,6 +8,7 @@
 #include <iostream>
 
 #include "i18n/tr.hpp"
+#include "util/hang_watchdog.hpp"
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <fcntl.h>
@@ -36,7 +38,21 @@ void print_backtrace_to_stderr(const char* reason) {
   std::cerr << std::flush;
 }
 
+std::atomic<bool> g_in_fatal_handler{false};
+
+void write_stderr(const char* text) {
+  (void)!::write(STDERR_FILENO, text, std::strlen(text));
+}
+
+// Solo funciones async-signal-safe. Si el crash viene de una corrupción del heap,
+// glibc aborta con el lock de la arena tomado: cualquier malloc aquí (iostream,
+// backtrace_symbols, i18n) se queda esperando ese lock para siempre y el crash se
+// convierte en un cuelgue con el terminal en modo raw.
 void on_fatal_signal(int sig) {
+  if (g_in_fatal_handler.exchange(true)) {
+    // Un fallo dentro del propio manejador: salir sin intentar nada más.
+    _exit(128 + sig);
+  }
   const char* name = "signal";
   switch (sig) {
     case SIGSEGV:
@@ -57,7 +73,17 @@ void on_fatal_signal(int sig) {
     default:
       break;
   }
-  print_backtrace_to_stderr(name);
+  // Primero el fichero (stderr suele ser la pantalla alternativa y se pierde) y
+  // luego el terminal, para que lo impreso abajo sea legible y la shell usable.
+  hang_watchdog::write_crash_report(name);
+  hang_watchdog::restore_terminal();
+  write_stderr("\n=== tuide crash (");
+  write_stderr(name);
+  write_stderr(") ===\n");
+  void* frames[128];
+  const int count = backtrace(frames, 128);
+  backtrace_symbols_fd(frames, count, STDERR_FILENO);
+  write_stderr("informe: ~/.config/tuide/hangs/crash-<pid>.txt\n");
   _exit(128 + sig);
 }
 
@@ -69,7 +95,16 @@ void on_tty_job_signal(int /*sig*/) {
 }  // namespace
 
 void install_crash_handlers() {
+#if defined(__linux__) || defined(__APPLE__)
+  // backtrace() carga libgcc_s con malloc en su primera llamada: hacerla aquí, no
+  // dentro del manejador.
+  void* warm[4];
+  (void)backtrace(warm, 4);
+#endif
+  hang_watchdog::prepare_crash_report();
   std::set_terminate([] {
+    hang_watchdog::write_crash_report("std::terminate");
+    hang_watchdog::restore_terminal();
     print_current_backtrace("std::terminate");
     std::abort();
   });
@@ -84,6 +119,18 @@ void install_crash_handlers() {
   std::signal(SIGFPE, on_fatal_signal);
   std::signal(SIGILL, on_fatal_signal);
   std::signal(SIGBUS, on_fatal_signal);
+#endif
+}
+
+void reinstall_fault_handlers() {
+#if defined(__linux__) || defined(__APPLE__)
+  struct sigaction sa;
+  std::memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = on_fatal_signal;
+  sigemptyset(&sa.sa_mask);
+  for (const int sig : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT}) {
+    ::sigaction(sig, &sa, nullptr);
+  }
 #endif
 }
 

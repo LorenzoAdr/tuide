@@ -291,6 +291,7 @@ add_executable(tuide
   src/editor/helix/helix_scope_nav.cpp
   src/editor/helix/helix_textobjects.cpp
   src/util/crash_handler.cpp
+  src/util/hang_watchdog.cpp
   src/util/child_process_guard.cpp
   src/util/monitor_log.cpp
   src/util/ui_activity_gate.cpp
@@ -882,6 +883,32 @@ add_executable(git_command_test
   src/i18n/strings_en.cpp
 )
 target_include_directories(git_command_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+add_executable(git_service_open_test
+  tests/git_service_open_test.cpp
+  src/git/git_service.cpp
+  src/git/git_subrepos.cpp
+  src/git/git_log.cpp
+  src/git/git_status.cpp
+  src/git/git_diff.cpp
+  src/git/git_command.cpp
+  src/util/path_normalize.cpp
+  src/util/monitor_log.cpp
+  src/util/child_process_guard.cpp
+  src/i18n/locale.cpp
+  src/i18n/tr.cpp
+  src/i18n/strings_es.cpp
+  src/i18n/strings_en.cpp
+)
+target_include_directories(git_service_open_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(git_service_open_test PRIVATE Threads::Threads)
+
+add_executable(hang_watchdog_test
+  tests/hang_watchdog_test.cpp
+  src/util/hang_watchdog.cpp
+)
+target_include_directories(hang_watchdog_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(hang_watchdog_test PRIVATE Threads::Threads)
 
 add_executable(level0_router_test
   tests/level0_router_test.cpp
@@ -1670,6 +1697,8 @@ set(TUIDE_TEST_TARGETS
   nm_reader_test
   git_diff_test
   git_command_test
+  git_service_open_test
+  hang_watchdog_test
   level0_router_test
   level0_intent_index_test
   level1_agent_test

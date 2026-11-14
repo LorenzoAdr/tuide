@@ -574,9 +574,12 @@ bool LspTransport::send_request(int id, const std::string& method, nlohmann::jso
     return false;
   }
 
-  std::ostringstream scope_name;
-  scope_name << "send_request method=" << method << " id=" << id;
-  monitor_log::MonitorScope request_scope("lsp", scope_name.str());
+  // Con el monitor apagado no se formatea el nombre: esto corre en cada petición.
+  std::string scope_name;
+  if (monitor_log::enabled()) {
+    scope_name = "send_request method=" + method + " id=" + std::to_string(id);
+  }
+  monitor_log::MonitorScope request_scope("lsp", scope_name);
 
   if (!write_request(id, method, std::move(params))) {
     TUIDE_MON("lsp", "send_request write_failed method=" + method);

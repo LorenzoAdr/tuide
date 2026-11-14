@@ -5,6 +5,7 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "ui/ui_event_trace.hpp"
@@ -49,12 +50,19 @@ class UiEventDispatcher {
   void enqueue(UiEvent event, bool urgent);
   void post_custom_coalesced(bool urgent = false);
 
-  ftxui::ScreenInteractive* screen_ = nullptr;
+  // Nulo hasta que el bucle de FTXUI atiende Post() (primer render): lo que se
+  // envía antes se perdería y, peor, dejaría custom_pending_ en true para siempre.
+  std::atomic<ftxui::ScreenInteractive*> screen_{nullptr};
+  std::vector<std::function<void()>> pending_main_;  // bajo pending_mutex_
+  // Hilo que llamó a set_screen (el de UI): fuera de él no se toca el estado de
+  // animación de FTXUI, que no es thread-safe.
+  std::thread::id ui_thread_;
   std::atomic<bool> custom_pending_{false};
   std::mutex pending_mutex_;
   std::vector<UiEvent> pending_events_;
   uint64_t next_correlation_id_ = 1;
-  uint64_t active_correlation_id_ = 0;
+  // Lo escribe la UI al empezar cada entrada; lo leen los ui_wake de hilos de fondo.
+  std::atomic<uint64_t> active_correlation_id_{0};
   UiEventTrace trace_;
 };
 
