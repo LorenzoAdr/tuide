@@ -1134,6 +1134,7 @@ const StringTable& spanish_strings() {
       {"cli.opt.core", "  --core <archivo>    Cargar core dump post-mortem"},
       {"cli.opt.core_analyzer", "  --core-analyzer     Usar pestana Core Analyzer (con --core)"},
       {"cli.opt.help", "  -h, --help          Muestra esta ayuda"},
+      {"cli.opt.version", "  -V, --version       Muestra la versión y sale"},
       {"cli.help.no_args", "Sin argumentos abre la pantalla de inicio TUIDE (modo IDE)."},
       {"cli.help.positional", "Un directorio abre el workspace; un archivo abre su carpeta con el archivo cargado."},
       {"cli.help.shortcuts", "F1 abrir archivo externo; Alt+F1/Shift+F1 atajos; F2 depuracion; F3 directorio de trabajo."},

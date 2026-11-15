@@ -17,6 +17,10 @@
 #include "util/crash_handler.hpp"
 #include "util/lsp_missing_prompt.hpp"
 
+#ifndef TUIDE_VERSION_STRING
+#define TUIDE_VERSION_STRING "unknown"
+#endif
+
 namespace {
 
 bool config_is_complete(const tuide::AppConfig &config) {
@@ -91,6 +95,7 @@ void print_usage() {
             << tr("cli.opt.core") << '\n'
             << tr("cli.opt.core_analyzer") << '\n'
             << tr("cli.opt.help") << '\n'
+            << tr("cli.opt.version") << '\n'
             << '\n'
             << tr("cli.help.no_args") << '\n'
             << tr("cli.help.positional") << '\n'
@@ -139,6 +144,10 @@ int main(int argc, char **argv) {
     const std::string arg = argv[i];
     if (arg == "-h" || arg == "--help") {
       print_usage();
+      return 0;
+    }
+    if (arg == "-V" || arg == "--version") {
+      std::cout << "tuide " << TUIDE_VERSION_STRING << '\n';
       return 0;
     }
     if (arg == "--cwd" && i + 1 < argc) {

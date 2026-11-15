@@ -1,5 +1,26 @@
 cmake_minimum_required(VERSION 3.20)
-project(tuide VERSION 0.1.0 LANGUAGES CXX C)
+project(tuide VERSION 0.1.6 LANGUAGES CXX C)
+
+# Version reported by `tuide --version`: $TUIDE_VERSION if set, else `git describe`,
+# else the project version above.
+if(DEFINED ENV{TUIDE_VERSION} AND NOT "$ENV{TUIDE_VERSION}" STREQUAL "")
+  set(TUIDE_VERSION_STRING "$ENV{TUIDE_VERSION}")
+else()
+  find_package(Git QUIET)
+  if(GIT_FOUND)
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} describe --tags
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      OUTPUT_VARIABLE TUIDE_VERSION_STRING
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  endif()
+  if(NOT TUIDE_VERSION_STRING)
+    set(TUIDE_VERSION_STRING "${PROJECT_VERSION}")
+  endif()
+endif()
+string(REGEX REPLACE "^v" "" TUIDE_VERSION_STRING "${TUIDE_VERSION_STRING}")
+message(STATUS "tuide version: ${TUIDE_VERSION_STRING}")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -462,6 +483,7 @@ endif()
 include(cmake/BundleOptions.cmake)
 target_compile_definitions(tuide PRIVATE
   "TUIDE_DEFAULT_UI_LOCALE_TAG=\"${TUIDE_DEFAULT_UI_LOCALE}\""
+  "TUIDE_VERSION_STRING=\"${TUIDE_VERSION_STRING}\""
 )
 if(TUIDE_DEFAULT_HELIX_MODE)
   target_compile_definitions(tuide PRIVATE TUIDE_DEFAULT_HELIX_MODE=1)

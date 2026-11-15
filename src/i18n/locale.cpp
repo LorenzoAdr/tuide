@@ -8,7 +8,7 @@ namespace tuide::i18n {
 namespace {
 
 UiLocale g_locale_setting = UiLocale::kAuto;
-UiLocale g_effective_locale = UiLocale::kEs;
+UiLocale g_effective_locale = UiLocale::kEn;
 
 bool starts_with_ci(std::string_view text, std::string_view prefix) {
   if (text.size() < prefix.size()) {
@@ -30,19 +30,18 @@ bool starts_with_ci(std::string_view text, std::string_view prefix) {
 
 }  // namespace
 
+// POSIX precedence for message language: LC_ALL, then LC_MESSAGES, then LANG.
+// Spanish only when the system asks for it; English for everything else,
+// including C/POSIX and unset environments.
 UiLocale detect_system_locale() {
-  const char* lang = std::getenv("LANG");
-  if (lang == nullptr || lang[0] == '\0') {
-    lang = std::getenv("LC_ALL");
+  for (const char* name : {"LC_ALL", "LC_MESSAGES", "LANG"}) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || value[0] == '\0') {
+      continue;
+    }
+    return starts_with_ci(value, "es") ? UiLocale::kEs : UiLocale::kEn;
   }
-  if (lang == nullptr || lang[0] == '\0') {
-    return UiLocale::kEs;
-  }
-  const std::string_view value(lang);
-  if (starts_with_ci(value, "en")) {
-    return UiLocale::kEn;
-  }
-  return UiLocale::kEs;
+  return UiLocale::kEn;
 }
 
 UiLocale resolve_locale(UiLocale setting) {

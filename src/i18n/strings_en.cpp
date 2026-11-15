@@ -1129,6 +1129,7 @@ const StringTable& english_strings() {
       {"cli.opt.core", "  --core <file>    Load post-mortem core dump"},
       {"cli.opt.core_analyzer", "  --core-analyzer     Use Core Analyzer tab (with --core)"},
       {"cli.opt.help", "  -h, --help          Show this help"},
+      {"cli.opt.version", "  -V, --version       Show version and exit"},
       {"cli.help.no_args", "No arguments opens the TUIDE welcome screen (IDE mode)."},
       {"cli.help.positional", "A directory opens the workspace; a file opens its folder with the file loaded."},
       {"cli.help.shortcuts", "F1 open external file; Alt+F1/Shift+F1 shortcuts; F2 debug; F3 working directory."},
