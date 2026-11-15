@@ -14,7 +14,7 @@ AppImage support. Installs `/opt/tuide`, the `tuide` command, a desktop entry an
    cp packaging/aur/PKGBUILD packaging/aur/.SRCINFO aur-tuide-bin/
    cd aur-tuide-bin
    git add PKGBUILD .SRCINFO
-   git commit -m "tuide-bin 0.1.5"
+   git commit -m "tuide-bin 0.1.6"
    git push
    ```
 

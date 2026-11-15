@@ -1,7 +1,7 @@
 # Maintainer: Lorenzo Arias del Real <lorenzo.adr at proton dot me>
 pkgname=tuide-bin
 _pkgname=tuide
-pkgver=0.1.5
+pkgver=0.1.6
 pkgrel=1
 pkgdesc='A full IDE in your terminal: LSP for 13 languages, DAP debugger, embedded shell and native-binary forensics'
 arch=('x86_64')
@@ -22,7 +22,7 @@ options=('!strip' '!debug')
 source=("${_pkgname}-${pkgver}.AppImage::https://github.com/LorenzoAdr/tuide/releases/download/v${pkgver}/tuide-${pkgver}.AppImage"
         "LICENSE-${pkgver}::https://raw.githubusercontent.com/LorenzoAdr/tuide/v${pkgver}/LICENSE")
 noextract=("${_pkgname}-${pkgver}.AppImage")
-sha256sums=('cc1c287e757d43940f6c933712159c073d80792c9916d39e9ea7ffefbcd7b505'
+sha256sums=('3987c89263f626594cadacd828fc13f002b8dbf3c6df800c3b56e73fcf204ed8'
             'SKIP')
 
 # The AppImage is an ELF runtime followed by a squashfs image. Extract the image
