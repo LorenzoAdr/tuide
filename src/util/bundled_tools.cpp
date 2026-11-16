@@ -1658,6 +1658,44 @@ std::optional<LuaLsLocation> resolve_lua_language_server() {
   return std::nullopt;
 }
 
+std::optional<MatlabLsLocation> resolve_matlab_language_server() {
+  // TUIDE_MATLAB_LS acepta un lanzador ejecutable o el out/index.js que deja
+  // `npm run package` en un clon de MATLAB-language-server; upstream no publica
+  // binario, así que el .js es la forma habitual de tenerlo.
+  if (const char* raw = std::getenv("TUIDE_MATLAB_LS"); raw != nullptr && raw[0] != '\0') {
+    const std::string value = raw;
+    if (fs::path(value).extension() == ".js") {
+      const auto node = [&]() -> std::optional<std::string> {
+        if (const auto env = env_executable("TUIDE_NODE_BIN"); env.has_value()) {
+          return env;
+        }
+        return find_named_binary_on_path("node");
+      }();
+      if (node.has_value() && readable_file(value)) {
+        MatlabLsLocation loc;
+        loc.binary_path = *node;
+        loc.use_node_script = true;
+        loc.script_path = value;
+        loc.source = MatlabLsLocation::Source::Env;
+        return loc;
+      }
+    } else if (const auto env_path = env_executable("TUIDE_MATLAB_LS"); env_path.has_value()) {
+      MatlabLsLocation loc;
+      loc.binary_path = *env_path;
+      loc.source = MatlabLsLocation::Source::Env;
+      return loc;
+    }
+  }
+  if (const auto path_bin = find_named_binary_on_path("matlab-language-server");
+      path_bin.has_value()) {
+    MatlabLsLocation loc;
+    loc.binary_path = *path_bin;
+    loc.source = MatlabLsLocation::Source::SystemPath;
+    return loc;
+  }
+  return std::nullopt;
+}
+
 std::optional<TypescriptLsLocation> resolve_typescript_language_server() {
   if (const auto env_path = env_executable("TUIDE_TYPESCRIPT_LS"); env_path.has_value()) {
     TypescriptLsLocation loc;

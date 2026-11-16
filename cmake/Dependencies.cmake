@@ -88,6 +88,15 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE
 )
 
+# Etiqueta fija: la gramática trae parser.c generado (3,4 MB) y el .h bajo
+# bindings/c/tree_sitter/, como bash y lua.
+FetchContent_Declare(
+  tree_sitter_matlab
+  GIT_REPOSITORY https://github.com/acristoffers/tree-sitter-matlab.git
+  GIT_TAG v1.3.3
+  GIT_SHALLOW TRUE
+)
+
 FetchContent_Declare(
   tree_sitter_javascript
   GIT_REPOSITORY https://github.com/tree-sitter/tree-sitter-javascript.git
@@ -156,7 +165,7 @@ function(tuide_add_tree_sitter_grammar name source_dir)
     POSITION_INDEPENDENT_CODE ON)
 endfunction()
 
-foreach(_gram python bash latex rust go zig fortran lua javascript typescript cmake make yaml xml)
+foreach(_gram python bash latex rust go zig fortran lua matlab javascript typescript cmake make yaml xml)
   FetchContent_GetProperties(tree_sitter_${_gram})
   if(NOT tree_sitter_${_gram}_POPULATED)
     FetchContent_Populate(tree_sitter_${_gram})
@@ -272,7 +281,7 @@ tuide_ensure_tree_sitter_c_header(make tree_sitter_make ${tree_sitter_make_SOURC
 # Upstream ships the header under bindings/c/tree_sitter/; keep flat path like other grammars.
 tuide_ensure_tree_sitter_c_header(yaml tree_sitter_yaml ${tree_sitter_yaml_SOURCE_DIR})
 
-foreach(_gram python bash latex rust go zig fortran lua javascript cmake make yaml)
+foreach(_gram python bash latex rust go zig fortran lua matlab javascript cmake make yaml)
   tuide_add_tree_sitter_grammar(${_gram} ${tree_sitter_${_gram}_SOURCE_DIR})
 endforeach()
 tuide_add_tree_sitter_grammar(typescript ${tree_sitter_typescript_SOURCE_DIR}/typescript)
@@ -288,6 +297,9 @@ foreach(_query_spec
     "zig|${tree_sitter_zig_SOURCE_DIR}/queries/highlights.scm"
     "fortran|${tree_sitter_fortran_SOURCE_DIR}/queries/highlights.scm"
     "lua|${tree_sitter_lua_SOURCE_DIR}/queries/highlights.scm"
+    # Upstream no tiene queries/highlights.scm en la raíz; la de helix es la única
+    # variante sin predicados (#match?/#eq?), que nuestro cliente C no evalúa.
+    "matlab|${tree_sitter_matlab_SOURCE_DIR}/queries/helix/highlights.scm"
     "javascript|${tree_sitter_javascript_SOURCE_DIR}/queries/highlights.scm"
     "cmake|${tree_sitter_cmake_SOURCE_DIR}/queries/highlights.scm"
     "make|${tree_sitter_make_SOURCE_DIR}/queries/highlights.scm"

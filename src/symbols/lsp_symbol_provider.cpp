@@ -52,7 +52,7 @@ bool language_allows_debounce_while_lsp_starting(const std::string& language_id)
   return language_id_is_python(language_id) || language_id_is_shellscript(language_id) ||
          language_id_is_latex(language_id) || language_id_is_rust(language_id) ||
          language_id_is_go(language_id) || language_id_is_zig(language_id) ||
-         language_id_is_fortran(language_id) || language_id_is_lua(language_id) ||
+         language_id_is_fortran(language_id) || language_id_is_lua(language_id) || language_id_is_matlab(language_id) ||
          language_id_is_js_ts(language_id) || language_id_is_cmake(language_id) ||
          language_id_is_make(language_id) || language_id_is_yaml(language_id) ||
          language_id_is_xml(language_id);
@@ -70,6 +70,7 @@ bool any_lazy_lsp_client_ready(const std::unique_ptr<LspClient>& python_client,
                                const std::unique_ptr<LspClient>& zig_client,
                                const std::unique_ptr<LspClient>& fortran_client,
                                const std::unique_ptr<LspClient>& lua_client,
+                               const std::unique_ptr<LspClient>& matlab_client,
                                const std::unique_ptr<LspClient>& typescript_client,
                                const std::unique_ptr<LspClient>& cmake_client,
                                const std::unique_ptr<LspClient>& make_client,
@@ -78,7 +79,7 @@ bool any_lazy_lsp_client_ready(const std::unique_ptr<LspClient>& python_client,
   return lazy_client_ready(python_client) || lazy_client_ready(bash_client) ||
          lazy_client_ready(tex_client) || lazy_client_ready(rust_client) ||
          lazy_client_ready(go_client) || lazy_client_ready(zig_client) ||
-         lazy_client_ready(fortran_client) || lazy_client_ready(lua_client) ||
+         lazy_client_ready(fortran_client) || lazy_client_ready(lua_client) || lazy_client_ready(matlab_client) ||
          lazy_client_ready(typescript_client) || lazy_client_ready(cmake_client) ||
          lazy_client_ready(make_client) || lazy_client_ready(yaml_client) ||
          lazy_client_ready(xml_client);
@@ -88,7 +89,7 @@ bool is_lazy_lsp_language(const std::string& language_id) {
   return language_id_is_python(language_id) || language_id_is_shellscript(language_id) ||
          language_id_is_latex(language_id) || language_id_is_rust(language_id) ||
          language_id_is_go(language_id) || language_id_is_zig(language_id) ||
-         language_id_is_fortran(language_id) || language_id_is_lua(language_id) ||
+         language_id_is_fortran(language_id) || language_id_is_lua(language_id) || language_id_is_matlab(language_id) ||
          language_id_is_js_ts(language_id) || language_id_is_cmake(language_id) ||
          language_id_is_make(language_id) || language_id_is_yaml(language_id) ||
          language_id_is_xml(language_id);
@@ -263,6 +264,12 @@ LspClient* LspSymbolProvider::client_for_path(const std::string& path) {
     }
     return nullptr;
   }
+  if (language_id_is_matlab(lang)) {
+    if (matlab_client_ && matlab_client_->ready()) {
+      return matlab_client_.get();
+    }
+    return nullptr;
+  }
   if (language_id_is_js_ts(lang)) {
     if (typescript_client_ && typescript_client_->ready()) {
       return typescript_client_.get();
@@ -308,7 +315,7 @@ bool LspSymbolProvider::any_lsp_ready() const {
     return true;
   }
   return any_lazy_lsp_client_ready(python_client_, bash_client_, tex_client_, rust_client_,
-                                   go_client_, zig_client_, fortran_client_, lua_client_,
+                                   go_client_, zig_client_, fortran_client_, lua_client_, matlab_client_,
                                    typescript_client_, cmake_client_, make_client_, yaml_client_, xml_client_);
 }
 
@@ -772,6 +779,10 @@ void LspSymbolProvider::join_lua_startup_thread() {
   join_lazy_startup_thread(lua_lsp_startup_thread_, lua_lsp_starting_);
 }
 
+void LspSymbolProvider::join_matlab_startup_thread() {
+  join_lazy_startup_thread(matlab_lsp_startup_thread_, matlab_lsp_starting_);
+}
+
 void LspSymbolProvider::join_typescript_startup_thread() {
   join_lazy_startup_thread(typescript_lsp_startup_thread_, typescript_lsp_starting_);
 }
@@ -864,6 +875,14 @@ void LspSymbolProvider::finish_lua_lsp_start_locked(bool ok, bool binary_missing
       lua_client_,
       {"lsp-lua-start", "lua", "status.lua_ls_missing", "status.lua_ls_failed",
        "status.lua_ls_started", "lua-language-server start failed or binary missing"},
+      ok, binary_missing);
+}
+
+void LspSymbolProvider::finish_matlab_lsp_start_locked(bool ok, bool binary_missing) {
+  finish_simple_lazy_lsp_start_locked(
+      matlab_client_,
+      {"lsp-matlab-start", "matlab", "status.matlab_ls_missing", "status.matlab_ls_failed",
+       "status.matlab_ls_started", "matlab-language-server start failed or binary missing"},
       ok, binary_missing);
 }
 
@@ -1020,6 +1039,15 @@ void LspSymbolProvider::ensure_lua_lsp_async() {
       &LspSymbolProvider::finish_lua_lsp_start_locked);
 }
 
+void LspSymbolProvider::ensure_matlab_lsp_async() {
+  ensure_simple_lazy_lsp_async(
+      matlab_client_, matlab_lsp_starting_, matlab_lsp_startup_thread_,
+      {"lsp-matlab-start", "matlab", "status.matlab_ls_missing", "status.matlab_ls_failed",
+       "status.matlab_ls_started", "matlab-language-server start failed or binary missing",
+       make_matlab_ls_spec},
+      &LspSymbolProvider::finish_matlab_lsp_start_locked);
+}
+
 void LspSymbolProvider::ensure_typescript_lsp_async() {
   ensure_simple_lazy_lsp_async(
       typescript_client_, typescript_lsp_starting_, typescript_lsp_startup_thread_,
@@ -1074,6 +1102,7 @@ void LspSymbolProvider::refresh_diagnostics_cache_locked() const {
   revision ^= client_diagnostics_revision(zig_client_, 6);
   revision ^= client_diagnostics_revision(fortran_client_, 7);
   revision ^= client_diagnostics_revision(lua_client_, 8);
+  revision ^= client_diagnostics_revision(matlab_client_, 15);
   revision ^= client_diagnostics_revision(typescript_client_, 9);
   revision ^= client_diagnostics_revision(cmake_client_, 10);
   revision ^= client_diagnostics_revision(make_client_, 11);
@@ -1092,6 +1121,7 @@ void LspSymbolProvider::refresh_diagnostics_cache_locked() const {
   append_client_diagnostics(cached_diagnostics_, zig_client_);
   append_client_diagnostics(cached_diagnostics_, fortran_client_);
   append_client_diagnostics(cached_diagnostics_, lua_client_);
+  append_client_diagnostics(cached_diagnostics_, matlab_client_);
   append_client_diagnostics(cached_diagnostics_, typescript_client_);
   append_client_diagnostics(cached_diagnostics_, cmake_client_);
   append_client_diagnostics(cached_diagnostics_, make_client_);
@@ -1132,7 +1162,7 @@ void LspSymbolProvider::finish_lsp_start_locked(bool ok) {
     use_lsp_ = true;
     clangd_launched_ = true;
   } else if (!any_lazy_lsp_client_ready(python_client_, bash_client_, tex_client_, rust_client_,
-                                        go_client_, zig_client_, fortran_client_, lua_client_,
+                                        go_client_, zig_client_, fortran_client_, lua_client_, matlab_client_,
                                         typescript_client_, cmake_client_, make_client_, yaml_client_, xml_client_)) {
     use_lsp_ = false;
   }
@@ -1263,6 +1293,7 @@ bool LspSymbolProvider::lsp_loading() const {
          zig_lsp_starting_.load(std::memory_order_acquire) ||
          fortran_lsp_starting_.load(std::memory_order_acquire) ||
          lua_lsp_starting_.load(std::memory_order_acquire) ||
+         matlab_lsp_starting_.load(std::memory_order_acquire) ||
          typescript_lsp_starting_.load(std::memory_order_acquire) ||
          cmake_lsp_starting_.load(std::memory_order_acquire) ||
          make_lsp_starting_.load(std::memory_order_acquire) ||
@@ -1342,6 +1373,11 @@ bool LspSymbolProvider::lua_lsp_ready() const {
   return lua_client_ && lua_client_->ready();
 }
 
+bool LspSymbolProvider::matlab_lsp_ready() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return matlab_client_ && matlab_client_->ready();
+}
+
 bool LspSymbolProvider::typescript_lsp_ready() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return typescript_client_ && typescript_client_->ready();
@@ -1385,6 +1421,10 @@ bool LspSymbolProvider::fortran_lsp_starting() const {
 
 bool LspSymbolProvider::lua_lsp_starting() const {
   return lua_lsp_starting_.load(std::memory_order_acquire);
+}
+
+bool LspSymbolProvider::matlab_lsp_starting() const {
+  return matlab_lsp_starting_.load(std::memory_order_acquire);
 }
 
 bool LspSymbolProvider::typescript_lsp_starting() const {
@@ -1463,6 +1503,7 @@ void LspSymbolProvider::stop_lsp() {
   LspClient* zig = nullptr;
   LspClient* fortran = nullptr;
   LspClient* lua = nullptr;
+  LspClient* matlab = nullptr;
   LspClient* typescript = nullptr;
   LspClient* cmake = nullptr;
   LspClient* make = nullptr;
@@ -1478,6 +1519,7 @@ void LspSymbolProvider::stop_lsp() {
     zig = zig_client_.get();
     fortran = fortran_client_.get();
     lua = lua_client_.get();
+    matlab = matlab_client_.get();
     typescript = typescript_client_.get();
     cmake = cmake_client_.get();
     make = make_client_.get();
@@ -1508,6 +1550,9 @@ void LspSymbolProvider::stop_lsp() {
   }
   if (lua != nullptr) {
     lua->stop();
+  }
+  if (matlab != nullptr) {
+    matlab->stop();
   }
   if (typescript != nullptr) {
     typescript->stop();
@@ -1541,7 +1586,9 @@ void LspSymbolProvider::stop_lsp() {
   join_thread_if_joinable(fortran_lsp_startup_thread_);
   fortran_lsp_starting_.store(false, std::memory_order_release);
   join_thread_if_joinable(lua_lsp_startup_thread_);
+  join_thread_if_joinable(matlab_lsp_startup_thread_);
   lua_lsp_starting_.store(false, std::memory_order_release);
+  matlab_lsp_starting_.store(false, std::memory_order_release);
   join_thread_if_joinable(typescript_lsp_startup_thread_);
   typescript_lsp_starting_.store(false, std::memory_order_release);
   join_thread_if_joinable(cmake_lsp_startup_thread_);
@@ -1568,6 +1615,7 @@ void LspSymbolProvider::stop_lsp() {
     fortran_compiler_diagnostics_.clear();
     fortran_compiler_diag_revision_.store(0, std::memory_order_release);
     lua_client_.reset();
+    matlab_client_.reset();
     typescript_client_.reset();
     cmake_client_.reset();
     make_client_.reset();
@@ -2426,6 +2474,9 @@ void LspSymbolProvider::set_diagnostics_notify_callback(
   if (lua_client_) {
     lua_client_->set_diagnostics_notify_callback(callback);
   }
+  if (matlab_client_) {
+    matlab_client_->set_diagnostics_notify_callback(callback);
+  }
   if (typescript_client_) {
     typescript_client_->set_diagnostics_notify_callback(callback);
   }
@@ -2529,6 +2580,9 @@ void LspSymbolProvider::set_lsp_request_counter(std::atomic<uint64_t>* counter) 
   if (lua_client_) {
     lua_client_->set_request_counter(counter);
   }
+  if (matlab_client_) {
+    matlab_client_->set_request_counter(counter);
+  }
   if (typescript_client_) {
     typescript_client_->set_request_counter(counter);
   }
@@ -2584,6 +2638,9 @@ void LspSymbolProvider::set_ui_inhibited(const bool inhibited) {
     if (lua_client_) {
       lua_client_->set_background_paused(true);
     }
+    if (matlab_client_) {
+      matlab_client_->set_background_paused(true);
+    }
     if (typescript_client_) {
       typescript_client_->set_background_paused(true);
     }
@@ -2625,6 +2682,9 @@ void LspSymbolProvider::set_ui_inhibited(const bool inhibited) {
   }
   if (lua_client_) {
     lua_client_->set_background_paused(false);
+  }
+  if (matlab_client_) {
+    matlab_client_->set_background_paused(false);
   }
   if (typescript_client_) {
     typescript_client_->set_background_paused(false);
@@ -2802,6 +2862,8 @@ void LspSymbolProvider::on_document_opened(const std::string& path, const std::s
       ensure_fortran_lsp_async();
     } else if (language_id_is_lua(lang)) {
       ensure_lua_lsp_async();
+    } else if (language_id_is_matlab(lang)) {
+      ensure_matlab_lsp_async();
     } else if (language_id_is_js_ts(lang)) {
       ensure_typescript_lsp_async();
     } else if (language_id_is_cmake(lang)) {
@@ -2846,6 +2908,8 @@ void LspSymbolProvider::on_document_opened(const std::string& path, const std::s
         ensure_fortran_lsp_async();
       } else if (language_id_is_lua(lang)) {
         ensure_lua_lsp_async();
+      } else if (language_id_is_matlab(lang)) {
+        ensure_matlab_lsp_async();
       } else if (language_id_is_js_ts(lang)) {
         ensure_typescript_lsp_async();
       } else if (language_id_is_cmake(lang)) {
@@ -2977,6 +3041,7 @@ std::vector<SymbolInfo> LspSymbolProvider::workspace_symbols(const std::string& 
   append_workspace_symbols(out, zig_client_, workspace_root_, query);
   append_workspace_symbols(out, fortran_client_, workspace_root_, query);
   append_workspace_symbols(out, lua_client_, workspace_root_, query);
+  append_workspace_symbols(out, matlab_client_, workspace_root_, query);
   append_workspace_symbols(out, typescript_client_, workspace_root_, query);
   append_workspace_symbols(out, cmake_client_, workspace_root_, query);
   append_workspace_symbols(out, make_client_, workspace_root_, query);
@@ -3023,6 +3088,7 @@ bool LspSymbolProvider::completion_uses_async_fetch() const {
          zig_lsp_starting_.load(std::memory_order_acquire) ||
          fortran_lsp_starting_.load(std::memory_order_acquire) ||
          lua_lsp_starting_.load(std::memory_order_acquire) ||
+         matlab_lsp_starting_.load(std::memory_order_acquire) ||
          typescript_lsp_starting_.load(std::memory_order_acquire) ||
          cmake_lsp_starting_.load(std::memory_order_acquire) ||
          make_lsp_starting_.load(std::memory_order_acquire) ||
@@ -3055,6 +3121,9 @@ bool LspSymbolProvider::lazy_lsp_starting_for_path(const std::string& path) cons
   }
   if (language_id_is_lua(lang)) {
     return lua_lsp_starting_.load(std::memory_order_acquire);
+  }
+  if (language_id_is_matlab(lang)) {
+    return matlab_lsp_starting_.load(std::memory_order_acquire);
   }
   if (language_id_is_js_ts(lang)) {
     return typescript_lsp_starting_.load(std::memory_order_acquire);
@@ -3121,6 +3190,7 @@ bool LspSymbolProvider::request_completion(const CompletionParams& params,
   cancel_client_completion(zig_client_);
   cancel_client_completion(fortran_client_);
   cancel_client_completion(lua_client_);
+  cancel_client_completion(matlab_client_);
   cancel_client_completion(typescript_client_);
   cancel_client_completion(cmake_client_);
   cancel_client_completion(make_client_);
@@ -3168,6 +3238,7 @@ void LspSymbolProvider::cancel_completion_fetch() {
   cancel_client_completion(zig_client_);
   cancel_client_completion(fortran_client_);
   cancel_client_completion(lua_client_);
+  cancel_client_completion(matlab_client_);
   cancel_client_completion(typescript_client_);
   cancel_client_completion(cmake_client_);
   cancel_client_completion(make_client_);
@@ -3208,6 +3279,7 @@ std::optional<std::vector<CompletionItem>> LspSymbolProvider::poll_completion(
   const int zig_latest = client_latest_completion_id(zig_client_);
   const int fortran_latest = client_latest_completion_id(fortran_client_);
   const int lua_latest = client_latest_completion_id(lua_client_);
+  const int matlab_latest = client_latest_completion_id(matlab_client_);
   const int typescript_latest = client_latest_completion_id(typescript_client_);
   const int cmake_latest = client_latest_completion_id(cmake_client_);
   const int make_latest = client_latest_completion_id(make_client_);
@@ -3218,7 +3290,7 @@ std::optional<std::vector<CompletionItem>> LspSymbolProvider::poll_completion(
        it->second.request_id != bash_latest && it->second.request_id != tex_latest &&
        it->second.request_id != rust_latest && it->second.request_id != go_latest &&
        it->second.request_id != zig_latest && it->second.request_id != fortran_latest &&
-       it->second.request_id != lua_latest && it->second.request_id != typescript_latest &&
+       it->second.request_id != lua_latest && it->second.request_id != matlab_latest && it->second.request_id != typescript_latest &&
        it->second.request_id != cmake_latest && it->second.request_id != make_latest &&
        it->second.request_id != yaml_latest && it->second.request_id != xml_latest)) {
     completion_cache_.erase(it);
@@ -3247,6 +3319,8 @@ void LspSymbolProvider::ensure_lazy_lsp_for_path(const std::string& path) {
     ensure_fortran_lsp_async();
   } else if (language_id_is_lua(lang)) {
     ensure_lua_lsp_async();
+  } else if (language_id_is_matlab(lang)) {
+    ensure_matlab_lsp_async();
   } else if (language_id_is_js_ts(lang)) {
     ensure_typescript_lsp_async();
   } else if (language_id_is_cmake(lang)) {
@@ -3677,6 +3751,7 @@ uint64_t LspSymbolProvider::diagnostics_revision() const {
   revision ^= client_diagnostics_revision(zig_client_, 6);
   revision ^= client_diagnostics_revision(fortran_client_, 7);
   revision ^= client_diagnostics_revision(lua_client_, 8);
+  revision ^= client_diagnostics_revision(matlab_client_, 15);
   revision ^= client_diagnostics_revision(typescript_client_, 9);
   revision ^= client_diagnostics_revision(cmake_client_, 10);
   revision ^= client_diagnostics_revision(make_client_, 11);

@@ -130,6 +130,11 @@ std::string language_id_for_path(const std::string& path) {
   if (ext == ".lua") {
     return "lua";
   }
+  // .m también es Objective-C, pero no tenemos gramática ni servidor para él:
+  // quien lo necesite puede forzar otro lenguaje con el override por fichero.
+  if (ext == ".m") {
+    return "matlab";
+  }
   if (ext == ".js" || ext == ".mjs" || ext == ".cjs") {
     return "javascript";
   }

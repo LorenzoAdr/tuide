@@ -3324,6 +3324,8 @@ int Application::run() {
 			flags.fortran_starting = symbol_provider_->fortran_lsp_starting();
 			flags.lua_ready = symbol_provider_->lua_lsp_ready();
 			flags.lua_starting = symbol_provider_->lua_lsp_starting();
+			flags.matlab_ready = symbol_provider_->matlab_lsp_ready();
+			flags.matlab_starting = symbol_provider_->matlab_lsp_starting();
 			flags.typescript_ready = symbol_provider_->typescript_lsp_ready();
 			flags.typescript_starting = symbol_provider_->typescript_lsp_starting();
 			flags.cmake_ready = symbol_provider_->cmake_lsp_ready();

@@ -18,6 +18,7 @@
 #include "tree-sitter-zig.h"
 #include "tree_sitter/tree-sitter-bash.h"
 #include "tree_sitter/tree-sitter-lua.h"
+#include "tree_sitter/tree-sitter-matlab.h"
 
 extern "C" TSLanguage* tree_sitter_cpp(void);
 
@@ -42,6 +43,8 @@ const TSLanguage* tree_sitter_zig_language() { return tree_sitter_zig(); }
 const TSLanguage* tree_sitter_fortran_language() { return tree_sitter_fortran(); }
 
 const TSLanguage* tree_sitter_lua_language() { return tree_sitter_lua(); }
+
+const TSLanguage* tree_sitter_matlab_language() { return tree_sitter_matlab(); }
 
 const TSLanguage* tree_sitter_javascript_language() { return tree_sitter_javascript(); }
 
@@ -103,6 +106,10 @@ TreeSitterLangKind tree_sitter_lang_kind_for_alias(const std::string& alias) {
   if (key == "lua") {
     return TreeSitterLangKind::kLua;
   }
+  // "m" a secas no: en bloques de código Markdown suele ser Objective-C.
+  if (key == "matlab" || key == "octave") {
+    return TreeSitterLangKind::kMatlab;
+  }
   if (key == "javascript" || key == "js" || key == "jsx") {
     return TreeSitterLangKind::kJavaScript;
   }
@@ -146,6 +153,8 @@ const TSLanguage* tree_sitter_language_for_kind(TreeSitterLangKind kind) {
       return tree_sitter_fortran_language();
     case TreeSitterLangKind::kLua:
       return tree_sitter_lua_language();
+    case TreeSitterLangKind::kMatlab:
+      return tree_sitter_matlab_language();
     case TreeSitterLangKind::kJavaScript:
       return tree_sitter_javascript_language();
     case TreeSitterLangKind::kTypeScript:

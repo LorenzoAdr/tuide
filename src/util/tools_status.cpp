@@ -233,6 +233,16 @@ ToolsStatusSnapshot collect_tools_status(const LspRuntimeFlags& lsp) {
       "lua-language-server", "settings.status.tool.lua_ls", lsp.lsp_enabled, lsp.lua_ready,
       lsp.lua_starting, lua_detail, lua_bin));
 
+  std::optional<std::string> matlab_detail;
+  bool matlab_bin = false;
+  if (const auto loc = resolve_matlab_language_server(); loc.has_value()) {
+    matlab_bin = true;
+    matlab_detail = detail_from_location(*loc);
+  }
+  snap.language_servers.push_back(make_lsp_entry(
+      "matlab-language-server", "settings.status.tool.matlab_ls", lsp.lsp_enabled,
+      lsp.matlab_ready, lsp.matlab_starting, matlab_detail, matlab_bin));
+
   std::optional<std::string> typescript_detail;
   bool typescript_bin = false;
   if (const auto loc = resolve_typescript_language_server(); loc.has_value()) {

@@ -18,6 +18,7 @@ enum class TreeSitterLangKind {
   kZig,
   kFortran,
   kLua,
+  kMatlab,
   kJavaScript,
   kTypeScript,
   kCmake,
@@ -36,6 +37,7 @@ const TSLanguage* tree_sitter_go_language();
 const TSLanguage* tree_sitter_zig_language();
 const TSLanguage* tree_sitter_fortran_language();
 const TSLanguage* tree_sitter_lua_language();
+const TSLanguage* tree_sitter_matlab_language();
 const TSLanguage* tree_sitter_javascript_language();
 const TSLanguage* tree_sitter_typescript_language();
 const TSLanguage* tree_sitter_cmake_language();

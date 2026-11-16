@@ -68,6 +68,7 @@ set(TUIDE_TREE_SITTER_INCLUDE_DIRS
   ${tree_sitter_zig_SOURCE_DIR}/bindings/c
   ${tree_sitter_fortran_SOURCE_DIR}/bindings/c
   ${tree_sitter_lua_SOURCE_DIR}/bindings/c
+  ${tree_sitter_matlab_SOURCE_DIR}/bindings/c
   ${tree_sitter_javascript_SOURCE_DIR}/bindings/c
   ${tree_sitter_typescript_SOURCE_DIR}/bindings/c
   ${tree_sitter_cmake_SOURCE_DIR}/bindings/c
@@ -88,6 +89,7 @@ set(TUIDE_TREE_SITTER_GRAMMAR_LIBS
   tree-sitter-zig
   tree-sitter-fortran
   tree-sitter-lua
+  tree-sitter-matlab
   tree-sitter-javascript
   tree-sitter-typescript
   tree-sitter-cmake
@@ -627,6 +629,27 @@ add_executable(tree_sitter_test
 )
 target_include_directories(tree_sitter_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 tuide_link_tree_sitter(tree_sitter_test)
+
+add_executable(tree_sitter_matlab_test
+  tests/tree_sitter_matlab_test.cpp
+  src/editor/editor_state.cpp
+  src/editor/editor_buffer_source.cpp
+  src/editor/text_rope.cpp
+  src/editor/text_ops.cpp
+  src/editor/editor_folds.cpp
+  src/editor/line_comment.cpp
+  src/editor/indent_guides.cpp
+  src/editor/text_search.cpp
+  src/editor/undo_stack.cpp
+  src/editor/clipboard.cpp
+  src/editor/bracket_match.cpp
+  src/util/clang_format_config.cpp
+  src/util/shell_utils.cpp
+  src/util/system_clipboard.cpp
+  src/ui/cursor_blink.cpp
+)
+target_include_directories(tree_sitter_matlab_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+tuide_link_tree_sitter(tree_sitter_matlab_test)
 
 add_executable(bracket_match_test
   tests/bracket_match_test.cpp
@@ -1641,6 +1664,43 @@ target_compile_definitions(lsp_completion_probe PRIVATE
 target_link_libraries(lsp_completion_probe PRIVATE ftxui::dom)
 tuide_link_pthread(lsp_completion_probe)
 
+add_executable(matlab_ls_spec_test
+  tests/matlab_ls_spec_test.cpp
+  tools/lsp_probe_stubs.cpp
+  src/lsp/language_server_spec.cpp
+  src/lsp/lsp_client.cpp
+  src/util/docker_clangd_spec.cpp
+  src/lsp/lsp_transport.cpp
+  src/lsp/lsp_uri.cpp
+  src/app/language_override.cpp
+  src/lsp/lsp_position.cpp
+  src/lsp/lsp_text_edits.cpp
+  src/indexer/index_rules.cpp
+  src/util/bundled_tools.cpp
+  src/toolpacks/paths.cpp
+  src/toolpacks/manifest.cpp
+  src/toolpacks/store.cpp
+  src/toolpacks/packaged.cpp
+  src/toolpacks/download.cpp
+  src/util/child_process_guard.cpp
+  src/util/monitor_log.cpp
+  src/util/path_normalize.cpp
+  src/util/clang_format_config.cpp
+  src/i18n/locale.cpp
+  src/i18n/tr.cpp
+  src/i18n/strings_es.cpp
+  src/i18n/strings_en.cpp
+)
+target_include_directories(matlab_ls_spec_test PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+)
+target_compile_definitions(matlab_ls_spec_test PRIVATE
+  TUIDE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+target_link_libraries(matlab_ls_spec_test PRIVATE ftxui::dom)
+tuide_link_pthread(matlab_ls_spec_test)
+
 add_executable(toolpacks_test
   tests/toolpacks_test.cpp
   src/toolpacks/paths.cpp
@@ -1673,6 +1733,8 @@ set(TUIDE_TEST_TARGETS
   text_buffer_bench
   text_rope_test
   tree_sitter_test
+  tree_sitter_matlab_test
+  matlab_ls_spec_test
   bracket_match_test
   indent_guides_test
   build_environment_test

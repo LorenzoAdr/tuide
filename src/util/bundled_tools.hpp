@@ -71,6 +71,15 @@ struct LuaLsLocation {
   enum class Source { Env, Toolpack, SystemPath, Bundled } source = Source::SystemPath;
 };
 
+// Sin bundle ni toolpack: el servidor de MathWorks no sirve de nada sin un MATLAB
+// con licencia en la máquina, así que empaquetarlo solo engordaría el binario.
+struct MatlabLsLocation {
+  std::string binary_path;
+  bool use_node_script = false;
+  std::string script_path;
+  enum class Source { Env, Toolpack, SystemPath, Bundled } source = Source::SystemPath;
+};
+
 struct TypescriptLsLocation {
   std::string binary_path;
   bool needs_stdio_flag = true;
@@ -138,6 +147,7 @@ std::optional<GoplsLocation> resolve_gopls();
 std::optional<ZlsLocation> resolve_zls();
 std::optional<FortlsLocation> resolve_fortls();
 std::optional<LuaLsLocation> resolve_lua_language_server();
+std::optional<MatlabLsLocation> resolve_matlab_language_server();
 std::optional<TypescriptLsLocation> resolve_typescript_language_server();
 std::optional<NeocmakelspLocation> resolve_neocmakelsp();
 std::optional<MakeLsLocation> resolve_make_ls();

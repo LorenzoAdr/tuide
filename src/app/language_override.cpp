@@ -30,6 +30,7 @@ const std::vector<LanguageChoice>& language_choices() {
       {"zig", "status.language.zig"},
       {"fortran", "status.language.fortran"},
       {"lua", "status.language.lua"},
+      {"matlab", "status.language.matlab"},
       {"javascript", "status.language.javascript"},
       {"typescript", "status.language.typescript"},
       {"cmake", "status.language.cmake"},

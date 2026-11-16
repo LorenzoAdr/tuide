@@ -46,6 +46,10 @@ bool language_id_is_lua(const std::string& language_id) {
   return language_id == "lua";
 }
 
+bool language_id_is_matlab(const std::string& language_id) {
+  return language_id == "matlab";
+}
+
 bool language_id_is_javascript(const std::string& language_id) {
   return language_id == "javascript";
 }
@@ -98,6 +102,9 @@ std::string language_server_id_for_language(const std::string& language_id) {
   }
   if (language_id_is_lua(language_id)) {
     return kLspServerLuaLs;
+  }
+  if (language_id_is_matlab(language_id)) {
+    return kLspServerMatlabLs;
   }
   if (language_id_is_js_ts(language_id)) {
     return kLspServerTypescriptLs;
@@ -338,6 +345,32 @@ std::optional<LanguageServerSpec> make_lua_ls_spec(const std::string& workspace_
   return spec;
 }
 
+std::optional<LanguageServerSpec> make_matlab_ls_spec(const std::string& workspace_root) {
+  const auto location = resolve_matlab_language_server();
+  if (!location.has_value()) {
+    return std::nullopt;
+  }
+
+  LanguageServerSpec spec;
+  spec.id = kLspServerMatlabLs;
+  spec.command = location->binary_path;
+  spec.workspace_root = workspace_root;
+  spec.language_ids = {"matlab"};
+  if (location->use_node_script) {
+    spec.args.push_back(location->script_path);
+  }
+  spec.args.emplace_back("--stdio");
+  // Los ajustes van por CLI: respondemos workspace/configuration con objetos vacíos
+  // y el servidor se queda con lo que se le sembró al arrancar.
+  // Sin índice, ir a definición y referencias solo ven los ficheros abiertos.
+  spec.args.emplace_back("--indexWorkspace");
+  // Si `matlab` no está en PATH el servidor no lo encuentra solo.
+  if (const char* root = std::getenv("TUIDE_MATLAB_ROOT"); root != nullptr && root[0] != '\0') {
+    spec.args.emplace_back(std::string("--matlabInstallPath=") + root);
+  }
+  return spec;
+}
+
 std::optional<LanguageServerSpec> make_typescript_ls_spec(const std::string& workspace_root) {
   const auto location = resolve_typescript_language_server();
   if (!location.has_value()) {
@@ -481,6 +514,9 @@ std::optional<LanguageServerSpec> make_language_server_spec(
   }
   if (server_id == kLspServerLuaLs) {
     return make_lua_ls_spec(workspace_root);
+  }
+  if (server_id == kLspServerMatlabLs) {
+    return make_matlab_ls_spec(workspace_root);
   }
   if (server_id == kLspServerTypescriptLs) {
     return make_typescript_ls_spec(workspace_root);

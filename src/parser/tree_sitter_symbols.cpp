@@ -544,6 +544,30 @@ void walk_lua_symbols(TSNode node, const std::string& source, int depth,
   walk_children(walk_lua_symbols, node, source, depth, file_path, out);
 }
 
+// Un .m es un script, un fichero de funciones o un classdef. Los métodos son
+// function_definition dentro de bloques `methods`, así que basta con bajar un nivel
+// al entrar en la clase para que el outline los anide.
+void walk_matlab_symbols(TSNode node, const std::string& source, int depth,
+                         const std::string& file_path, std::vector<SymbolInfo>* out) {
+  if (ts_node_is_null(node)) {
+    return;
+  }
+  const char* type = ts_node_type(node);
+  if (type == nullptr) {
+    return;
+  }
+
+  const bool is_class = std::strcmp(type, "class_definition") == 0;
+  if (is_class || std::strcmp(type, "function_definition") == 0) {
+    append_symbol(out, is_class ? SymbolKind::kClass : SymbolKind::kFunction,
+                  field_or_node_name(node, source, "name"), node, depth, file_path);
+    walk_children(walk_matlab_symbols, node, source, depth + 1, file_path, out);
+    return;
+  }
+
+  walk_children(walk_matlab_symbols, node, source, depth, file_path, out);
+}
+
 void walk_js_ts_symbols(TSNode node, const std::string& source, int depth,
                         const std::string& file_path, std::vector<SymbolInfo>* out) {
   if (ts_node_is_null(node)) {
@@ -702,6 +726,9 @@ std::vector<SymbolInfo> extract_symbols_from_tree(TSNode root, const std::string
       break;
     case TreeSitterLangKind::kLua:
       walk_lua_symbols(root, source, 0, file_path, &symbols);
+      break;
+    case TreeSitterLangKind::kMatlab:
+      walk_matlab_symbols(root, source, 0, file_path, &symbols);
       break;
     case TreeSitterLangKind::kJavaScript:
     case TreeSitterLangKind::kTypeScript:

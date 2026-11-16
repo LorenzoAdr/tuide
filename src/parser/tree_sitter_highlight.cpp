@@ -400,6 +400,10 @@ TSQuery* highlight_query_for_lang(TreeSitterLangKind lang) {
     static TSQuery* query = nullptr;
     return cached_query(&query, tree_sitter_lua_language(), tree_sitter_queries::lua());
   }
+  if (lang == TreeSitterLangKind::kMatlab) {
+    static TSQuery* query = nullptr;
+    return cached_query(&query, tree_sitter_matlab_language(), tree_sitter_queries::matlab());
+  }
   if (lang == TreeSitterLangKind::kJavaScript) {
     static TSQuery* query = nullptr;
     return cached_query(&query, tree_sitter_javascript_language(), tree_sitter_queries::javascript());

@@ -135,6 +135,7 @@ class LspSymbolProvider : public ISymbolProvider {
   bool zig_lsp_ready() const;
   bool fortran_lsp_ready() const;
   bool lua_lsp_ready() const;
+  bool matlab_lsp_ready() const;
   bool typescript_lsp_ready() const;
   bool cmake_lsp_ready() const;
   bool make_lsp_ready() const;
@@ -149,6 +150,7 @@ class LspSymbolProvider : public ISymbolProvider {
   bool zig_lsp_starting() const;
   bool fortran_lsp_starting() const;
   bool lua_lsp_starting() const;
+  bool matlab_lsp_starting() const;
   bool typescript_lsp_starting() const;
   bool cmake_lsp_starting() const;
   bool make_lsp_starting() const;
@@ -214,6 +216,7 @@ class LspSymbolProvider : public ISymbolProvider {
   void ensure_fortran_lsp_async();
   void refresh_fortran_compiler_diagnostics(const std::string& path, const std::string& text);
   void ensure_lua_lsp_async();
+  void ensure_matlab_lsp_async();
   void ensure_typescript_lsp_async();
   void ensure_cmake_lsp_async();
   void ensure_make_lsp_async();
@@ -228,6 +231,7 @@ class LspSymbolProvider : public ISymbolProvider {
   void finish_zig_lsp_start_locked(bool ok, bool binary_missing);
   void finish_fortran_lsp_start_locked(bool ok, bool binary_missing);
   void finish_lua_lsp_start_locked(bool ok, bool binary_missing);
+  void finish_matlab_lsp_start_locked(bool ok, bool binary_missing);
   void finish_typescript_lsp_start_locked(bool ok, bool binary_missing);
   void finish_cmake_lsp_start_locked(bool ok, bool binary_missing);
   void finish_make_lsp_start_locked(bool ok, bool binary_missing);
@@ -243,6 +247,7 @@ class LspSymbolProvider : public ISymbolProvider {
   void join_zig_startup_thread();
   void join_fortran_startup_thread();
   void join_lua_startup_thread();
+  void join_matlab_startup_thread();
   void join_typescript_startup_thread();
   void join_cmake_startup_thread();
   void join_make_startup_thread();
@@ -313,6 +318,7 @@ class LspSymbolProvider : public ISymbolProvider {
   std::unordered_map<std::string, DocumentDiagnostics> fortran_compiler_diagnostics_;
   std::atomic<uint64_t> fortran_compiler_diag_revision_{0};
   std::unique_ptr<LspClient> lua_client_;
+  std::unique_ptr<LspClient> matlab_client_;
   std::unique_ptr<LspClient> typescript_client_;
   std::unique_ptr<LspClient> cmake_client_;
   std::unique_ptr<LspClient> make_client_;
@@ -345,6 +351,7 @@ class LspSymbolProvider : public ISymbolProvider {
   std::thread zig_lsp_startup_thread_;
   std::thread fortran_lsp_startup_thread_;
   std::thread lua_lsp_startup_thread_;
+  std::thread matlab_lsp_startup_thread_;
   std::thread typescript_lsp_startup_thread_;
   std::thread cmake_lsp_startup_thread_;
   std::thread make_lsp_startup_thread_;
@@ -359,6 +366,7 @@ class LspSymbolProvider : public ISymbolProvider {
   std::atomic<bool> zig_lsp_starting_{false};
   std::atomic<bool> fortran_lsp_starting_{false};
   std::atomic<bool> lua_lsp_starting_{false};
+  std::atomic<bool> matlab_lsp_starting_{false};
   std::atomic<bool> typescript_lsp_starting_{false};
   std::atomic<bool> cmake_lsp_starting_{false};
   std::atomic<bool> make_lsp_starting_{false};

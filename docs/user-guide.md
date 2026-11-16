@@ -31,6 +31,7 @@ Press **F2** to open the debug connection wizard from IDE mode. When a debug ses
 | Zig | `.zig` | zls | GDB |
 | Fortran | `.f90`, `.f`, … | fortls | GDB |
 | Lua | `.lua` | lua-language-server | — |
+| MATLAB | `.m` | MATLAB-language-server (needs a local MATLAB R2021b+) | — |
 | JavaScript / TypeScript | `.js`, `.ts`, `.tsx`, … | typescript-language-server | — |
 | CMake | `CMakeLists.txt`, `.cmake` | neocmakelsp | — |
 | Make | `Makefile`, `.mk` | make-ls | — |
@@ -72,6 +73,7 @@ Language servers and debug tools can be **system installs** on `PATH`, **embedde
 | zls | Zig LSP | (PATH / bundled) |
 | fortls | Fortran LSP | (PATH / bundled) |
 | lua-language-server | Lua LSP | (PATH / bundled) |
+| MATLAB-language-server | MATLAB LSP | `TUIDE_MATLAB_LS` (launcher or `out/index.js`) / PATH; `TUIDE_MATLAB_ROOT` if `matlab` is not on PATH |
 | typescript-language-server | JS/TS LSP | (PATH / bundled) |
 | neocmakelsp | CMake LSP | (PATH / bundled) |
 | make-ls | Makefile LSP | (PATH / bundled) |

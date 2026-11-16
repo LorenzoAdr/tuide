@@ -30,6 +30,7 @@ inline constexpr const char* kLspServerGopls = "gopls";
 inline constexpr const char* kLspServerZls = "zls";
 inline constexpr const char* kLspServerFortls = "fortls";
 inline constexpr const char* kLspServerLuaLs = "lua-language-server";
+inline constexpr const char* kLspServerMatlabLs = "matlab-language-server";
 inline constexpr const char* kLspServerTypescriptLs = "typescript-language-server";
 inline constexpr const char* kLspServerNeocmakelsp = "neocmakelsp";
 inline constexpr const char* kLspServerMakeLs = "make-ls";
@@ -45,6 +46,7 @@ bool language_id_is_go(const std::string& language_id);
 bool language_id_is_zig(const std::string& language_id);
 bool language_id_is_fortran(const std::string& language_id);
 bool language_id_is_lua(const std::string& language_id);
+bool language_id_is_matlab(const std::string& language_id);
 bool language_id_is_javascript(const std::string& language_id);
 bool language_id_is_typescript(const std::string& language_id);
 bool language_id_is_js_ts(const std::string& language_id);
@@ -79,6 +81,7 @@ std::optional<LanguageServerSpec> make_zls_spec(const std::string& workspace_roo
 std::optional<LanguageServerSpec> make_fortls_spec(const std::string& workspace_root);
 
 std::optional<LanguageServerSpec> make_lua_ls_spec(const std::string& workspace_root);
+std::optional<LanguageServerSpec> make_matlab_ls_spec(const std::string& workspace_root);
 
 std::optional<LanguageServerSpec> make_typescript_ls_spec(const std::string& workspace_root);
 

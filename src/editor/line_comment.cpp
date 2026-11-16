@@ -80,7 +80,7 @@ LineCommentStyle line_comment_style_for_path(const std::string& path) {
     return html_style();
   }
 
-  if (extension_in(ext, {".tex", ".latex", ".sty", ".cls"})) {
+  if (extension_in(ext, {".tex", ".latex", ".sty", ".cls", ".m"})) {
     return {"% ", ""};
   }
 

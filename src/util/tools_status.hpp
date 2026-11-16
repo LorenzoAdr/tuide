@@ -45,6 +45,8 @@ struct LspRuntimeFlags {
   bool fortran_starting = false;
   bool lua_ready = false;
   bool lua_starting = false;
+  bool matlab_ready = false;
+  bool matlab_starting = false;
   bool typescript_ready = false;
   bool typescript_starting = false;
   bool cmake_ready = false;
